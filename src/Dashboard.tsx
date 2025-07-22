@@ -26,7 +26,8 @@ import {
   MenuItem,
   Fade,
   useMediaQuery,
-  Collapse
+  Collapse,
+  Alert
 } from '@mui/material';
 import {
   Search,
@@ -47,6 +48,7 @@ import Fuse from 'fuse.js';
 import { NotesDialog } from './components/NotesDialog';
 import { SimpleAttendanceDialog } from './components/SimpleAttendanceDialog';
 import { googleSheetsService, type Student } from './services/googleSheets';
+import { useAuth } from './hooks/useAuth';
 
 // Apple-inspired theme with rounded corners and soft shadows
 const appleTheme = createTheme({
@@ -429,16 +431,18 @@ function StudentCard({ student, onStatusChange, onActivitySelect, onNotesOpen, o
                 size="small"
                 sx={{
                   transform: isMobile ? 'scale(0.7)' : 'scale(0.8)',
+                  mb: isMobile ? 0.2 : 0.3,
                 }}
               />
               <Typography 
                 variant="caption" 
                 color={isPresent ? 'success.main' : 'error.main'}
                 sx={{ 
-                  fontSize: isMobile ? '0.6rem' : '0.7rem', 
-                  fontWeight: 700, 
-                  mt: isMobile ? -1 : -0.5,
-                  lineHeight: 1
+                  fontSize: isMobile ? '0.55rem' : '0.65rem', 
+                  fontWeight: 600, 
+                  lineHeight: 1,
+                  textAlign: 'center',
+                  minWidth: isMobile ? '30px' : '35px',
                 }}
               >
                 {isPresent ? 'Present' : 'Absent'}
@@ -750,6 +754,9 @@ export default function Stutra() {
   const [selectedSection, setSelectedSection] = useState<string>('All');
   const [attendanceDialogOpen, setAttendanceDialogOpen] = useState(false);
   const isMobile = useMediaQuery('(max-width:600px)');
+  
+  // Authentication context
+  const { user, hasPermission, canAccessSection, isLoading } = useAuth();
 
   // Load students from Google Sheets on component mount
   useEffect(() => {
@@ -795,9 +802,22 @@ export default function Stutra() {
   useEffect(() => {
     let studentsToFilter = students;
     
-    // Filter by section first
+    // Apply role-based filtering first
+    if (user && !hasPermission('view_all_students')) {
+      // For teachers, only show students from sections they can access
+      if (user.role === 'teacher' && user.sections) {
+        studentsToFilter = students.filter(student => 
+          user.sections!.includes(student.section)
+        );
+      } else if (user.role === 'teacher') {
+        // Teacher with no assigned sections sees no students
+        studentsToFilter = [];
+      }
+    }
+    
+    // Filter by selected section
     if (selectedSection && selectedSection !== 'All') {
-      studentsToFilter = students.filter(student => student.section === selectedSection);
+      studentsToFilter = studentsToFilter.filter(student => student.section === selectedSection);
     }
     
     // Then apply search filter
@@ -811,7 +831,46 @@ export default function Stutra() {
     } else {
       setFilteredStudents(studentsToFilter);
     }
-  }, [searchTerm, students, selectedSection]);
+  }, [searchTerm, students, selectedSection, user, hasPermission]);
+
+  // Filter available sections based on user permissions
+  const availableSections = user?.role === 'admin' 
+    ? sections 
+    : user?.role === 'teacher' && user.sections 
+      ? ['All', ...user.sections] 
+      : ['All'];
+
+  // Show loading state while authentication is being checked
+  if (isLoading) {
+    return (
+      <ThemeProvider theme={appleTheme}>
+        <CssBaseline />
+        <Container maxWidth="lg" sx={{ py: 3, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
+          <Typography variant="h6" color="text.secondary">Loading...</Typography>
+        </Container>
+      </ThemeProvider>
+    );
+  }
+
+  // Show access denied if user doesn't have proper permissions
+  if (!user || (!hasPermission('view_students') && !hasPermission('view_all_students'))) {
+    return (
+      <ThemeProvider theme={appleTheme}>
+        <CssBaseline />
+        <Container maxWidth="lg" sx={{ py: 3 }}>
+          <Alert severity="error" sx={{ mt: 3 }}>
+            <Typography variant="h6" gutterBottom>Access Denied</Typography>
+            <Typography>
+              You don't have permission to view student attendance. Please contact an administrator to assign you the proper role.
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+              Your account: {user?.email}
+            </Typography>
+          </Alert>
+        </Container>
+      </ThemeProvider>
+    );
+  }
 
   const handleStatusChange = async (studentId: number, status: Student['status'], activity: string, timerEnd: number | null) => {
     // Get previous status for logging
@@ -833,7 +892,8 @@ export default function Stutra() {
       const updatedStudent = students.find(s => s.id === studentId);
       if (updatedStudent) {
         const studentToUpdate = { ...updatedStudent, status, activity, timer_end: timerEnd };
-        await googleSheetsService.updateStudentWithLog(studentToUpdate, previousStatus);
+        const loggedBy = user ? `${user.name} (${user.email})` : 'Unknown User';
+        await googleSheetsService.updateStudentWithLog(studentToUpdate, previousStatus, loggedBy);
       }
     } catch (error) {
       console.error('Failed to update student in database:', error);
@@ -998,7 +1058,7 @@ export default function Stutra() {
                   },
                 }}
               >
-                {sections.map((section) => (
+                {availableSections.map((section) => (
                   <MenuItem key={section} value={section}>
                     {section}
                   </MenuItem>
@@ -1037,7 +1097,7 @@ export default function Stutra() {
                   },
                 }}
               >
-                {selectedSection === 'All' ? 'All Present' : `${selectedSection} Present`}
+                {selectedSection === 'All' ? 'Mark All Present' : `Mark ${selectedSection} Present`}
               </Button>
               <Button
                 variant="outlined"
@@ -1053,7 +1113,7 @@ export default function Stutra() {
                   },
                 }}
               >
-                Reports
+                Export CSV
               </Button>
             </Box>
           </Box>
