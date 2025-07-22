@@ -1,0 +1,219 @@
+import { getDatabase, ref, set, get, child, push } from 'firebase/database';
+import { initializeApp } from 'firebase/app';
+import type { Teacher, LoginCredentials, CreateTeacherData } from '../types/auth';
+
+// Use the same Firebase config as googleSheets service
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "demo-key",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "demo-project.firebaseapp.com",
+  databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL || "https://demo-project-default-rtdb.firebaseio.com/",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "demo-project",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "demo-project.appspot.com",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "123456789",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:123456789:web:abcdef123456"
+};
+
+class AuthService {
+  private app;
+  private database;
+  private currentTeacher: Teacher | null = null;
+
+  constructor() {
+    this.app = initializeApp(firebaseConfig, 'auth-app');
+    this.database = getDatabase(this.app);
+  }
+
+  // Simple password hashing (in production, use bcrypt or similar)
+  private hashPassword(password: string): string {
+    // This is a very basic hash - use proper hashing in production
+    return btoa(password + 'salt_key_stutra');
+  }
+
+  private verifyPassword(password: string, hashedPassword: string): boolean {
+    return this.hashPassword(password) === hashedPassword;
+  }
+
+  async createTeacher(data: CreateTeacherData): Promise<Teacher> {
+    try {
+      // Check if teacher with email already exists
+      const existingTeacher = await this.getTeacherByEmail(data.email);
+      if (existingTeacher) {
+        throw new Error('Teacher with this email already exists');
+      }
+
+      const teacherId = push(child(ref(this.database), 'teachers')).key!;
+      const teacher: Teacher = {
+        id: teacherId,
+        email: data.email.toLowerCase(),
+        name: data.name,
+        password: this.hashPassword(data.password),
+        sections: data.sections,
+        isAdmin: data.isAdmin || false,
+        createdAt: Date.now(),
+      };
+
+      await set(ref(this.database, `teachers/${teacherId}`), teacher);
+      
+      // Return teacher without password
+      const { password: _, ...teacherWithoutPassword } = teacher;
+      return { ...teacherWithoutPassword, password: '' } as Teacher;
+    } catch (error) {
+      console.error('Error creating teacher:', error);
+      throw error;
+    }
+  }
+
+  async login(credentials: LoginCredentials): Promise<Teacher> {
+    try {
+      const teacher = await this.getTeacherByEmail(credentials.email);
+      
+      if (!teacher) {
+        throw new Error('Teacher not found');
+      }
+
+      if (!this.verifyPassword(credentials.password, teacher.password)) {
+        throw new Error('Invalid password');
+      }
+
+      // Update last login
+      await set(ref(this.database, `teachers/${teacher.id}/lastLogin`), Date.now());
+      
+      this.currentTeacher = teacher;
+      
+      // Store in localStorage for persistence
+      localStorage.setItem('stutra_teacher', JSON.stringify({
+        id: teacher.id,
+        email: teacher.email,
+        name: teacher.name,
+        sections: teacher.sections,
+        isAdmin: teacher.isAdmin,
+      }));
+
+      // Return teacher without password
+      const { password, ...teacherWithoutPassword } = teacher;
+      return { ...teacherWithoutPassword, password: '' } as Teacher;
+    } catch (error) {
+      console.error('Error logging in:', error);
+      throw error;
+    }
+  }
+
+  async logout(): Promise<void> {
+    this.currentTeacher = null;
+    localStorage.removeItem('stutra_teacher');
+  }
+
+  getCurrentTeacher(): Teacher | null {
+    if (this.currentTeacher) {
+      return this.currentTeacher;
+    }
+
+    // Try to get from localStorage
+    const stored = localStorage.getItem('stutra_teacher');
+    if (stored) {
+      try {
+        const teacher = JSON.parse(stored);
+        this.currentTeacher = teacher;
+        return teacher;
+      } catch (error) {
+        console.error('Error parsing stored teacher data:', error);
+        localStorage.removeItem('stutra_teacher');
+      }
+    }
+
+    return null;
+  }
+
+  isAuthenticated(): boolean {
+    return this.getCurrentTeacher() !== null;
+  }
+
+  async getTeacherByEmail(email: string): Promise<Teacher | null> {
+    try {
+      const teachersRef = ref(this.database, 'teachers');
+      const snapshot = await get(teachersRef);
+      
+      if (snapshot.exists()) {
+        const teachers = snapshot.val();
+        
+        for (const teacherId in teachers) {
+          const teacher = teachers[teacherId];
+          if (teacher.email.toLowerCase() === email.toLowerCase()) {
+            return { ...teacher, id: teacherId };
+          }
+        }
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Error getting teacher by email:', error);
+      throw error;
+    }
+  }
+
+  async getAllTeachers(): Promise<Teacher[]> {
+    try {
+      const teachersRef = ref(this.database, 'teachers');
+      const snapshot = await get(teachersRef);
+      
+      if (snapshot.exists()) {
+        const teachers = snapshot.val();
+        return Object.entries(teachers).map(([id, teacher]: [string, any]) => ({
+          ...teacher,
+          id,
+          password: '', // Don't return passwords
+        }));
+      }
+      
+      return [];
+    } catch (error) {
+      console.error('Error getting all teachers:', error);
+      throw error;
+    }
+  }
+
+  async updateTeacher(teacherId: string, updates: Partial<Teacher>): Promise<void> {
+    try {
+      if (updates.password) {
+        updates.password = this.hashPassword(updates.password);
+      }
+      
+      await set(ref(this.database, `teachers/${teacherId}`), updates);
+    } catch (error) {
+      console.error('Error updating teacher:', error);
+      throw error;
+    }
+  }
+
+  async deleteTeacher(teacherId: string): Promise<void> {
+    try {
+      await set(ref(this.database, `teachers/${teacherId}`), null);
+    } catch (error) {
+      console.error('Error deleting teacher:', error);
+      throw error;
+    }
+  }
+
+  // Create default admin account if no teachers exist
+  async initializeDefaultAdmin(): Promise<void> {
+    try {
+      const teachers = await this.getAllTeachers();
+      
+      if (teachers.length === 0) {
+        console.log('No teachers found, creating default admin...');
+        await this.createTeacher({
+          email: 'admin@stutra.com',
+          name: 'Admin',
+          password: 'admin123',
+          sections: [], // Admin can access all sections
+          isAdmin: true,
+        });
+        console.log('Default admin created: admin@stutra.com / admin123');
+      }
+    } catch (error) {
+      console.error('Error initializing default admin:', error);
+    }
+  }
+}
+
+export const authService = new AuthService();

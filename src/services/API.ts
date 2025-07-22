@@ -483,10 +483,7 @@ class GoogleSheetsService {
     }
 
     try {
-      // Fix: Ensure IDs are strings for sorting
-      students.sort((a, b) => a.id.toString().localeCompare(b.id.toString()));
-
-      // Fix: Use object type for sectionsData
+      // Group students by their section
       const sectionsData: { [key: string]: { [key: string]: Student } } = {};
       students.forEach(student => {
         if (!sectionsData[student.section]) {
@@ -495,6 +492,7 @@ class GoogleSheetsService {
         sectionsData[student.section][student.id.toString()] = student;
       });
 
+      // Save grouped data to the 'sections' node in Firebase
       const sectionsRef = ref(this.database, 'sections');
       await set(sectionsRef, sectionsData);
 
@@ -528,27 +526,45 @@ class GoogleSheetsService {
     }
   }
 
-  async getSections(): Promise<string[]> {
+  async getStudentsBySection(section: string): Promise<Student[]> {
     if (!this.initialized || !this.database) {
       console.warn('Firebase not initialized, using fallback data');
       return [];
     }
 
     try {
-      const dbRef = ref(this.database, 'sections');
-      const snapshot = await get(dbRef);
+      const sectionRef = ref(this.database, `sections/${section}`);
+      const snapshot = await get(sectionRef);
 
       if (snapshot.exists()) {
-        return Object.keys(snapshot.val());
+        return Object.values(snapshot.val()) as Student[];
       } else {
-        console.log('No sections data found');
+        console.log(`No students found for section: ${section}`);
         return [];
       }
     } catch (error) {
-      console.error('Failed to fetch sections from Firebase:', error);
+      console.error(`Failed to fetch students for section ${section}:`, error);
       return [];
+    }
+  }
+
+  async saveStudentToSection(student: Student): Promise<boolean> {
+    if (!this.initialized || !this.database) {
+      console.warn('Firebase not initialized, changes not saved');
+      return false;
+    }
+
+    try {
+      const studentRef = ref(this.database, `sections/${student.section}/${student.id}`);
+      await set(studentRef, student);
+      console.log(`Student ${student.name} saved successfully to section ${student.section}`);
+      return true;
+    } catch (error) {
+      console.error(`Failed to save student ${student.name} to section ${student.section}:`, error);
+      return false;
     }
   }
 }
 
 export const googleSheetsService = new GoogleSheetsService();
+

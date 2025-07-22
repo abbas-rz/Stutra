@@ -46,7 +46,8 @@ import {
 import Fuse from 'fuse.js';
 import { NotesDialog } from './components/NotesDialog';
 import { SimpleAttendanceDialog } from './components/SimpleAttendanceDialog';
-import { googleSheetsService, type Student } from './services/googleSheets';
+import { googleSheetsService, type Student } from './services/API';
+import { authService } from './services/auth';
 
 // Apple-inspired theme with rounded corners and soft shadows
 const appleTheme = createTheme({
@@ -779,6 +780,21 @@ export default function Stutra() {
 
     loadStudents();
   }, [selectedSection]);
+
+  // Load sections for the logged-in teacher
+  useEffect(() => {
+    const loadSectionsForTeacher = async () => {
+      try {
+        const teacherId = await authService.getLoggedInTeacherId();
+        const assignedSections = await authService.getSectionsForTeacher(teacherId);
+        setSections(['All', ...assignedSections]);
+      } catch (error) {
+        console.error('Failed to load sections for teacher:', error);
+      }
+    };
+
+    loadSectionsForTeacher();
+  }, []);
 
   // Live updates every 10 seconds (more frequent for instant feel)
   useEffect(() => {

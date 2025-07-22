@@ -47,7 +47,7 @@ import {
 import Fuse from 'fuse.js';
 import { NotesDialog } from './components/NotesDialog';
 import { SimpleAttendanceDialog } from './components/SimpleAttendanceDialog';
-import { googleSheetsService, type Student } from './services/googleSheets';
+import { googleSheetsService, type Student } from './services/API';
 import { useAuth } from './hooks/useAuth';
 
 // Apple-inspired theme with rounded corners and soft shadows

@@ -23,7 +23,7 @@ import {
   TableChart,
   FileDownload,
 } from '@mui/icons-material';
-import { googleSheetsService } from '../services/googleSheets';
+import { googleSheetsService } from '../services/API';
 
 interface SimpleAttendanceDialogProps {
   open: boolean;
@@ -151,10 +151,8 @@ export function SimpleAttendanceDialog({
           </Typography>
         </Box>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-          Export date-based attendance with proper daily tracking 
+          Export date-based attendance with proper daily tracking
         </Typography>
-
-
       </DialogTitle>
 
       <DialogContent>
@@ -299,3 +297,10 @@ export function SimpleAttendanceDialog({
   );
 }
 
+
+interface SimpleAttendanceDialogProps {
+  open: boolean;
+  onClose: () => void;
+  sections: string[];
+  selectedSection: string;
+}
