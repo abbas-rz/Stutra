@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
   ThemeProvider,
   createTheme,
@@ -18,7 +18,15 @@ import {
   ListItem,
   ListItemText,
   InputAdornment,
-  IconButton
+  IconButton,
+  Switch,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Fade,
+  useMediaQuery,
+  Collapse
 } from '@mui/material';
 import {
   Search,
@@ -29,7 +37,10 @@ import {
   Assignment,
   DirectionsRun,
   Refresh,
-  Note
+  Note,
+  RestartAlt,
+  ExpandMore,
+  ExpandLess
 } from '@mui/icons-material';
 import Fuse from 'fuse.js';
 import { NotesDialog } from './components/NotesDialog';
@@ -72,36 +83,81 @@ const appleTheme = createTheme({
   },
   typography: {
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    h4: {
+      fontWeight: 700,
+      letterSpacing: '-0.8px',
+      fontSize: '1.75rem',
+      '@media (max-width:600px)': {
+        fontSize: '1.5rem',
+      },
+    },
     h5: {
       fontWeight: 700,
       letterSpacing: '-0.5px',
+      fontSize: '1.5rem',
+      '@media (max-width:600px)': {
+        fontSize: '1.25rem',
+      },
     },
     subtitle2: {
       fontWeight: 600,
       letterSpacing: '-0.2px',
     },
+    body2: {
+      '@media (max-width:600px)': {
+        fontSize: '0.85rem',
+      },
+    },
   },
   shape: {
-    borderRadius: 12,
+    borderRadius: 16,
+  },
+  breakpoints: {
+    values: {
+      xs: 0,
+      sm: 600,
+      md: 900,
+      lg: 1200,
+      xl: 1536,
+    },
   },
   components: {
+    MuiContainer: {
+      styleOverrides: {
+        root: {
+          '@media (max-width:600px)': {
+            paddingLeft: 12,
+            paddingRight: 12,
+          },
+        },
+      },
+    },
     MuiCard: {
       styleOverrides: {
         root: {
-          borderRadius: 16,
+          borderRadius: 20,
           backdropFilter: 'blur(20px)',
-          backgroundColor: 'rgba(28, 28, 30, 0.9)',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
+          backgroundColor: 'rgba(28, 28, 30, 0.95)',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+          '@media (max-width:600px)': {
+            borderRadius: 16,
+          },
         },
       },
     },
     MuiButton: {
       styleOverrides: {
         root: {
-          borderRadius: 10,
+          borderRadius: 12,
           textTransform: 'none',
           fontWeight: 600,
           boxShadow: 'none',
+          minHeight: 44,
+          '@media (max-width:600px)': {
+            minHeight: 48,
+            fontSize: '1rem',
+          },
           '&:hover': {
             boxShadow: '0 4px 20px rgba(0, 122, 255, 0.3)',
           },
@@ -112,8 +168,12 @@ const appleTheme = createTheme({
       styleOverrides: {
         root: {
           '& .MuiOutlinedInput-root': {
-            borderRadius: 12,
+            borderRadius: 14,
             backgroundColor: 'rgba(118, 118, 128, 0.12)',
+            minHeight: 48,
+            '@media (max-width:600px)': {
+              minHeight: 52,
+            },
             '&:hover': {
               backgroundColor: 'rgba(118, 118, 128, 0.16)',
             },
@@ -124,11 +184,67 @@ const appleTheme = createTheme({
         },
       },
     },
+    MuiSelect: {
+      styleOverrides: {
+        root: {
+          borderRadius: 14,
+          backgroundColor: 'rgba(118, 118, 128, 0.12)',
+          minHeight: 48,
+          '@media (max-width:600px)': {
+            minHeight: 52,
+          },
+        },
+      },
+    },
     MuiChip: {
       styleOverrides: {
         root: {
-          borderRadius: 8,
+          borderRadius: 10,
           fontWeight: 600,
+          height: 32,
+          '@media (max-width:600px)': {
+            height: 36,
+            fontSize: '0.8rem',
+          },
+        },
+      },
+    },
+    MuiSwitch: {
+      styleOverrides: {
+        root: {
+          width: 51,
+          height: 31,
+          padding: 0,
+          '& .MuiSwitch-switchBase': {
+            padding: 0,
+            margin: 2,
+            transitionDuration: '300ms',
+            '&.Mui-checked': {
+              transform: 'translateX(20px)',
+              color: '#fff',
+              '& + .MuiSwitch-track': {
+                backgroundColor: '#30D158',
+                opacity: 1,
+                border: 0,
+              },
+            },
+            '&.Mui-focusVisible .MuiSwitch-thumb': {
+              color: '#30D158',
+              border: '6px solid #fff',
+            },
+          },
+          '& .MuiSwitch-thumb': {
+            boxSizing: 'border-box',
+            width: 27,
+            height: 27,
+            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
+          },
+          '& .MuiSwitch-track': {
+            borderRadius: 31 / 2,
+            backgroundColor: '#FF453A',
+            opacity: 1,
+            transition: 'background-color 300ms',
+          },
         },
       },
     },
@@ -150,12 +266,15 @@ interface StudentCardProps {
   onStatusChange: (studentId: number, status: Student['status'], activity: string, timerEnd: number | null) => void;
   onActivitySelect: (studentId: number) => void;
   onNotesOpen: (studentId: number) => void;
+  onResetStudent: (studentId: number) => void;
 }
 
-function StudentCard({ student, onStatusChange, onActivitySelect, onNotesOpen }: StudentCardProps) {
+function StudentCard({ student, onStatusChange, onActivitySelect, onNotesOpen, onResetStudent }: StudentCardProps) {
   const [timeRemaining, setTimeRemaining] = useState('');
+  const [notesExpanded, setNotesExpanded] = useState(false);
   const statusInfo = statusConfig[student.status];
   const StatusIcon = statusInfo.icon;
+  const isPresent = student.status !== 'absent';
 
   useEffect(() => {
     if (student.timer_end) {
@@ -180,6 +299,8 @@ function StudentCard({ student, onStatusChange, onActivitySelect, onNotesOpen }:
   }, [student.timer_end, student.id, onStatusChange]);
 
   const handleStatusClick = (status: Student['status']) => {
+    if (!isPresent && status !== 'present') return; // Prevent status changes when absent
+    
     if (status === 'washroom') {
       const timerEnd = new Date().getTime() + (12 * 60 * 1000); // 12 minutes
       onStatusChange(student.id, status, '', timerEnd);
@@ -190,6 +311,17 @@ function StudentCard({ student, onStatusChange, onActivitySelect, onNotesOpen }:
     }
   };
 
+  const handlePresentToggle = (checked: boolean) => {
+    if (checked) {
+      onStatusChange(student.id, 'present', '', null);
+    } else {
+      onStatusChange(student.id, 'absent', '', null);
+    }
+  };
+
+  const latestNote = student.notes && student.notes.length > 0 ? student.notes[student.notes.length - 1] : null;
+  const hasMultipleNotes = student.notes && student.notes.length > 1;
+
   return (
     <Card 
       sx={{ 
@@ -197,6 +329,7 @@ function StudentCard({ student, onStatusChange, onActivitySelect, onNotesOpen }:
         display: 'flex', 
         flexDirection: 'column',
         transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
+        opacity: isPresent ? 1 : 0.7,
         '&:hover': {
           transform: 'translateY(-2px)',
           boxShadow: '0 8px 25px rgba(0, 0, 0, 0.3)',
@@ -204,44 +337,84 @@ function StudentCard({ student, onStatusChange, onActivitySelect, onNotesOpen }:
       }}
     >
       <CardContent sx={{ flexGrow: 1, p: 2 }}>
+        {/* Header with Avatar, Student Info, and Present/Absent Toggle */}
         <Box display="flex" alignItems="center" mb={1.5}>
           <Avatar 
             sx={{ 
               width: 44, 
               height: 44, 
               mr: 1.5, 
-              bgcolor: 'primary.main',
-              boxShadow: '0 2px 10px rgba(0, 122, 255, 0.3)',
+              bgcolor: isPresent ? 'primary.main' : 'rgba(255, 255, 255, 0.3)',
+              boxShadow: isPresent ? '0 2px 10px rgba(0, 122, 255, 0.3)' : 'none',
             }}
           >
             <Person />
           </Avatar>
           <Box flexGrow={1}>
-            <Typography variant="subtitle2" fontWeight="bold" noWrap>
-              {student.name}
-            </Typography>
+            <Box display="flex" alignItems="center" justifyContent="space-between">
+              <Typography variant="subtitle2" fontWeight="bold" noWrap sx={{ flex: 1 }}>
+                {student.name}
+              </Typography>
+              <IconButton
+                size="small"
+                onClick={() => onResetStudent(student.id)}
+                sx={{
+                  bgcolor: 'rgba(118, 118, 128, 0.12)',
+                  color: 'text.secondary',
+                  width: 24,
+                  height: 24,
+                  ml: 1,
+                  '&:hover': {
+                    bgcolor: 'rgba(255, 255, 255, 0.1)',
+                    color: 'text.primary',
+                  },
+                }}
+              >
+                <RestartAlt sx={{ fontSize: '0.8rem' }} />
+              </IconButton>
+            </Box>
             <Typography variant="caption" color="text.secondary">
               {student.admission_number}
             </Typography>
           </Box>
-          <IconButton
-            size="small"
-            onClick={() => onNotesOpen(student.id)}
-            sx={{
-              bgcolor: student.notes && student.notes.length > 0 ? 'warning.main' : 'transparent',
-              color: student.notes && student.notes.length > 0 ? 'black' : 'text.secondary',
-              '&:hover': {
-                bgcolor: 'warning.main',
-                color: 'black',
-              },
-              width: 32,
-              height: 32,
-            }}
-          >
-            <Note fontSize="small" />
-          </IconButton>
+          <Box display="flex" alignItems="center" gap={1}>
+            <IconButton
+              size="small"
+              onClick={() => onNotesOpen(student.id)}
+              sx={{
+                bgcolor: student.notes && student.notes.length > 0 ? 'warning.main' : 'transparent',
+                color: student.notes && student.notes.length > 0 ? 'black' : 'text.secondary',
+                '&:hover': {
+                  bgcolor: 'warning.main',
+                  color: 'black',
+                },
+                width: 32,
+                height: 32,
+              }}
+            >
+              <Note fontSize="small" />
+            </IconButton>
+            <Box display="flex" flexDirection="column" alignItems="center">
+              <Switch
+                checked={isPresent}
+                onChange={(e) => handlePresentToggle(e.target.checked)}
+                size="small"
+                sx={{
+                  transform: 'scale(0.8)',
+                }}
+              />
+              <Typography 
+                variant="caption" 
+                color={isPresent ? 'success.main' : 'error.main'}
+                sx={{ fontSize: '0.65rem', fontWeight: 600, mt: -0.5 }}
+              >
+                {isPresent ? 'Present' : 'Absent'}
+              </Typography>
+            </Box>
+          </Box>
         </Box>
 
+        {/* Status Chip and Timer */}
         <Box display="flex" alignItems="center" justifyContent="space-between" mb={1.5}>
           <Chip
             icon={<StatusIcon />}
@@ -253,9 +426,10 @@ function StudentCard({ student, onStatusChange, onActivitySelect, onNotesOpen }:
               fontSize: '0.75rem',
               fontWeight: 600,
               boxShadow: `0 2px 8px ${statusInfo.color}40`,
+              opacity: isPresent ? 1 : 0.5,
             }}
           />
-          {timeRemaining && (
+          {timeRemaining && isPresent && (
             <Typography 
               variant="caption" 
               color="primary"
@@ -272,7 +446,8 @@ function StudentCard({ student, onStatusChange, onActivitySelect, onNotesOpen }:
           )}
         </Box>
 
-        {student.activity && (
+        {/* Activity and Notes Info */}
+        {student.activity && isPresent && (
           <Typography 
             variant="caption" 
             color="warning.main" 
@@ -290,41 +465,115 @@ function StudentCard({ student, onStatusChange, onActivitySelect, onNotesOpen }:
           </Typography>
         )}
 
-        {student.notes && student.notes.length > 0 && (
-          <Typography 
-            variant="caption" 
-            color="info.main" 
-            display="block" 
-            mb={1.5}
-            sx={{ 
-              bgcolor: 'rgba(100, 210, 255, 0.1)',
-              px: 1,
-              py: 0.5,
-              borderRadius: 1,
-              fontWeight: 500,
-            }}
-          >
-            📝 {student.notes.length} note{student.notes.length !== 1 ? 's' : ''}
-          </Typography>
+        {/* Notes Section - Show latest note visibly */}
+        {latestNote && (
+          <Box mb={1.5}>
+            <Box
+              onClick={() => hasMultipleNotes && setNotesExpanded(!notesExpanded)}
+              sx={{ 
+                bgcolor: 'rgba(100, 210, 255, 0.1)',
+                px: 1,
+                py: 0.5,
+                borderRadius: 1,
+                cursor: hasMultipleNotes ? 'pointer' : 'default',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <Typography 
+                variant="caption" 
+                color="info.main"
+                sx={{ 
+                  fontWeight: 500,
+                  fontSize: '0.75rem',
+                  flex: 1,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: notesExpanded ? 'normal' : 'nowrap',
+                }}
+              >
+                📝 {latestNote}
+              </Typography>
+              {hasMultipleNotes && (
+                <Box sx={{ display: 'flex', alignItems: 'center', ml: 1 }}>
+                  <Typography 
+                    variant="caption" 
+                    color="info.main"
+                    sx={{ fontSize: '0.65rem', mr: 0.5 }}
+                  >
+                    +{student.notes.length - 1}
+                  </Typography>
+                  {notesExpanded ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
+                </Box>
+              )}
+            </Box>
+            
+            {/* Expanded notes */}
+            <Collapse in={notesExpanded}>
+              <Box mt={1}>
+                {student.notes.slice(0, -1).map((note, index) => (
+                  <Typography 
+                    key={index}
+                    variant="caption" 
+                    color="info.main"
+                    display="block"
+                    sx={{ 
+                      bgcolor: 'rgba(100, 210, 255, 0.05)',
+                      px: 1,
+                      py: 0.5,
+                      borderRadius: 1,
+                      fontSize: '0.7rem',
+                      mb: 0.5,
+                    }}
+                  >
+                    📝 {note}
+                  </Typography>
+                ))}
+                <Button
+                  size="small"
+                  onClick={() => onNotesOpen(student.id)}
+                  sx={{ 
+                    mt: 0.5,
+                    fontSize: '0.65rem',
+                    textTransform: 'none',
+                  }}
+                >
+                  Manage Notes
+                </Button>
+              </Box>
+            </Collapse>
+          </Box>
         )}
 
+        {/* Action Buttons */}
         <Box display="flex" gap={0.5} flexWrap="wrap">
-          {Object.entries(statusConfig).map(([status, config]) => {
+          {Object.entries(statusConfig)
+            .filter(([status]) => status !== 'present' && status !== 'absent') // Remove present/absent buttons
+            .map(([status, config]) => {
             const Icon = config.icon;
+            const isDisabled = !isPresent;
             return (
               <IconButton
                 key={status}
                 size="small"
                 onClick={() => handleStatusClick(status as Student['status'])}
+                disabled={isDisabled}
                 sx={{
                   bgcolor: student.status === status ? config.color : 'rgba(118, 118, 128, 0.12)',
                   color: student.status === status ? 'white' : config.color,
                   border: student.status === status ? 'none' : `1px solid ${config.color}40`,
-                  '&:hover': {
+                  opacity: isDisabled ? 0.3 : 1,
+                  '&:hover': !isDisabled ? {
                     bgcolor: config.color,
                     color: 'white',
                     transform: 'scale(1.05)',
                     boxShadow: `0 4px 12px ${config.color}40`,
+                  } : {},
+                  '&.Mui-disabled': {
+                    bgcolor: 'rgba(118, 118, 128, 0.06)',
+                    color: 'rgba(118, 118, 128, 0.3)',
+                    border: '1px solid rgba(118, 118, 128, 0.1)',
                   },
                   minWidth: 0,
                   width: 36,
@@ -433,6 +682,9 @@ export default function Stutra() {
   const [activityDialogOpen, setActivityDialogOpen] = useState(false);
   const [notesDialogOpen, setNotesDialogOpen] = useState(false);
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
+  const [sections, setSections] = useState<string[]>([]);
+  const [selectedSection, setSelectedSection] = useState<string>('All');
+  const isMobile = useMediaQuery('(max-width:600px)');
 
   // Load students from Google Sheets on component mount
   useEffect(() => {
@@ -441,48 +693,82 @@ export default function Stutra() {
         await googleSheetsService.initialize();
         const studentsData = await googleSheetsService.getStudents();
         setStudents(studentsData);
+        
+        // Get available sections
+        const availableSections = await googleSheetsService.getSections();
+        setSections(['All', ...availableSections]);
+        if (availableSections.length > 0 && selectedSection === 'All') {
+          setSelectedSection('All');
+        }
       } catch (error) {
         console.error('Failed to load students:', error);
         // Fallback to mock data
         const mockStudents = await googleSheetsService.getStudents();
         setStudents(mockStudents);
+        const availableSections = await googleSheetsService.getSections();
+        setSections(['All', ...availableSections]);
       }
     };
 
     loadStudents();
+  }, [selectedSection]);
+
+  // Live updates every 10 seconds (more frequent for instant feel)
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const studentsData = await googleSheetsService.getStudents();
+        setStudents(studentsData);
+      } catch (error) {
+        console.error('Failed to refresh students data:', error);
+      }
+    }, 10000); // 10 seconds for faster updates
+
+    return () => clearInterval(interval);
   }, []);
 
-  // Fuzzy search setup
-  const fuse = React.useMemo(() => new Fuse(students, {
-    keys: ['name', 'admission_number'],
-    threshold: 0.3,
-  }), [students]);
-
   useEffect(() => {
+    let studentsToFilter = students;
+    
+    // Filter by section first
+    if (selectedSection && selectedSection !== 'All') {
+      studentsToFilter = students.filter(student => student.section === selectedSection);
+    }
+    
+    // Then apply search filter
     if (searchTerm) {
+      const fuse = new Fuse(studentsToFilter, {
+        keys: ['name', 'admission_number'],
+        threshold: 0.3,
+      });
       const results = fuse.search(searchTerm);
       setFilteredStudents(results.map(result => result.item));
     } else {
-      setFilteredStudents(students);
+      setFilteredStudents(studentsToFilter);
     }
-  }, [searchTerm, students, fuse]);
+  }, [searchTerm, students, selectedSection]);
 
-  const handleStatusChange = (studentId: number, status: Student['status'], activity: string, timerEnd: number | null) => {
+  const handleStatusChange = async (studentId: number, status: Student['status'], activity: string, timerEnd: number | null) => {
+    // Update local state immediately for instant feedback
     setStudents(prev => {
       const updated = prev.map(student => 
         student.id === studentId 
           ? { ...student, status, activity, timer_end: timerEnd }
           : student
       );
-      
-      // Update in Google Sheets
-      const updatedStudent = updated.find(s => s.id === studentId);
-      if (updatedStudent) {
-        googleSheetsService.updateStudent(updatedStudent);
-      }
-      
       return updated;
     });
+
+    // Update in Firebase asynchronously
+    try {
+      const updatedStudent = students.find(s => s.id === studentId);
+      if (updatedStudent) {
+        const studentToUpdate = { ...updatedStudent, status, activity, timer_end: timerEnd };
+        await googleSheetsService.updateStudent(studentToUpdate);
+      }
+    } catch (error) {
+      console.error('Failed to update student in database:', error);
+    }
   };
 
   const handleActivitySelect = (studentId: number) => {
@@ -501,28 +787,34 @@ export default function Stutra() {
     }
   };
 
-  const handleAddNote = (note: string) => {
+  const handleAddNote = async (note: string) => {
     if (selectedStudentId) {
+      // Update local state immediately
       setStudents(prev => {
         const updated = prev.map(student => 
           student.id === selectedStudentId 
             ? { ...student, notes: [...(student.notes || []), note] }
             : student
         );
-        
-        // Update in Google Sheets
-        const updatedStudent = updated.find(s => s.id === selectedStudentId);
-        if (updatedStudent) {
-          googleSheetsService.updateStudent(updatedStudent);
-        }
-        
         return updated;
       });
+      
+      // Update in Firebase asynchronously
+      try {
+        const updatedStudent = students.find(s => s.id === selectedStudentId);
+        if (updatedStudent) {
+          const studentToUpdate = { ...updatedStudent, notes: [...(updatedStudent.notes || []), note] };
+          await googleSheetsService.updateStudent(studentToUpdate);
+        }
+      } catch (error) {
+        console.error('Failed to update student notes in database:', error);
+      }
     }
   };
 
-  const handleDeleteNote = (noteIndex: number) => {
+  const handleDeleteNote = async (noteIndex: number) => {
     if (selectedStudentId) {
+      // Update local state immediately
       setStudents(prev => {
         const updated = prev.map(student => 
           student.id === selectedStudentId 
@@ -532,32 +824,65 @@ export default function Stutra() {
               }
             : student
         );
-        
-        // Update in Google Sheets
-        const updatedStudent = updated.find(s => s.id === selectedStudentId);
-        if (updatedStudent) {
-          googleSheetsService.updateStudent(updatedStudent);
-        }
-        
         return updated;
       });
+      
+      // Update in Firebase asynchronously
+      try {
+        const updatedStudent = students.find(s => s.id === selectedStudentId);
+        if (updatedStudent) {
+          const studentToUpdate = { 
+            ...updatedStudent, 
+            notes: updatedStudent.notes?.filter((_, index) => index !== noteIndex) || []
+          };
+          await googleSheetsService.updateStudent(studentToUpdate);
+        }
+      } catch (error) {
+        console.error('Failed to update student notes in database:', error);
+      }
     }
   };
 
-  const markAllPresent = () => {
-    const updated = students.map(student => ({
-      ...student,
-      status: 'present' as const,
-      activity: '',
-      timer_end: null
-    }));
+  const markAllPresent = async () => {
+    const studentsToUpdate = selectedSection === 'All' 
+      ? students 
+      : students.filter(student => student.section === selectedSection);
+      
+    // Update local state immediately
+    const updated = students.map(student => 
+      studentsToUpdate.some(s => s.id === student.id)
+        ? { ...student, status: 'present' as const, activity: '', timer_end: null }
+        : student
+    );
     
     setStudents(updated);
     
-    // Update all students in Google Sheets
-    updated.forEach(student => {
-      googleSheetsService.updateStudent(student);
-    });
+    // Update all affected students in Firebase asynchronously
+    try {
+      const promises = studentsToUpdate.map(student => {
+        const updatedStudent = { ...student, status: 'present' as const, activity: '', timer_end: null };
+        return googleSheetsService.updateStudent(updatedStudent);
+      });
+      await Promise.all(promises);
+    } catch (error) {
+      console.error('Failed to update students in database:', error);
+    }
+  };
+
+  const handleResetStudent = async (studentId: number) => {
+    try {
+      // Update local state immediately
+      setStudents(prev => prev.map(student => 
+        student.id === studentId 
+          ? { ...student, status: 'present' as const, activity: '', timer_end: null, notes: [] }
+          : student
+      ));
+      
+      // Update in Firebase asynchronously
+      await googleSheetsService.resetIndividualStudent(studentId);
+    } catch (error) {
+      console.error('Failed to reset student:', error);
+    }
   };
 
   const selectedStudent = selectedStudentId ? students.find(s => s.id === selectedStudentId) : null;
@@ -565,25 +890,56 @@ export default function Stutra() {
   return (
     <ThemeProvider theme={appleTheme}>
       <CssBaseline />
-      <Container maxWidth="lg" sx={{ py: 3 }}>
+      <Container maxWidth="lg" sx={{ py: 3, position: 'relative', minHeight: '100vh' }}>
         <Box mb={4}>
-          <Typography 
-            variant="h5" 
-            component="h1" 
-            gutterBottom 
-            sx={{ 
-              background: 'linear-gradient(45deg, #007AFF, #5AC8FA)',
-              backgroundClip: 'text',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              fontWeight: 700,
-              letterSpacing: '-0.5px',
-            }}
-          >
-            📚 Stutra - Student Tracker
-          </Typography>
+          {/* Header with Title and Section Selector */}
+          <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={3}>
+            <Typography 
+              variant={isMobile ? "h5" : "h4"}
+              component="h1" 
+              sx={{ 
+                background: 'linear-gradient(45deg, #007AFF, #5AC8FA)',
+                backgroundClip: 'text',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                fontWeight: 700,
+                letterSpacing: '-0.5px',
+              }}
+            >
+              📚 Stutra
+            </Typography>
+            
+            {/* Section Dropdown */}
+            <FormControl size="small" sx={{ minWidth: 120 }}>
+              <InputLabel sx={{ color: 'text.secondary' }}>Section</InputLabel>
+              <Select
+                value={selectedSection}
+                label="Section"
+                onChange={(e) => setSelectedSection(e.target.value)}
+                sx={{
+                  color: 'text.primary',
+                  '& .MuiOutlinedInput-notchedOutline': {
+                    borderColor: 'rgba(255, 255, 255, 0.2)',
+                  },
+                  '&:hover .MuiOutlinedInput-notchedOutline': {
+                    borderColor: 'primary.main',
+                  },
+                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                    borderColor: 'primary.main',
+                  },
+                }}
+              >
+                {sections.map((section) => (
+                  <MenuItem key={section} value={section}>
+                    {section}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Box>
           
-          <Box display="flex" gap={2} mt={3}>
+          {/* Search and Controls */}
+          <Box display="flex" gap={2} flexDirection={isMobile ? 'column' : 'row'}>
             <TextField
               fullWidth
               placeholder="Search students by name or admission number..."
@@ -604,32 +960,63 @@ export default function Stutra() {
               startIcon={<Refresh />}
               sx={{ 
                 whiteSpace: 'nowrap',
-                minWidth: 140,
+                minWidth: isMobile ? 'auto' : 140,
                 background: 'linear-gradient(45deg, #30D158, #32D74B)',
                 '&:hover': {
                   background: 'linear-gradient(45deg, #28B946, #30D158)',
                 },
               }}
             >
-              All Present
+              {selectedSection === 'All' ? 'All Present' : `${selectedSection} Present`}
             </Button>
           </Box>
         </Box>
 
-        <Box 
-          display="grid" 
-          gridTemplateColumns="repeat(auto-fill, minmax(280px, 1fr))" 
-          gap={3}
+        {/* Students Grid */}
+        <Fade in={true} timeout={800}>
+          <Box 
+            display="grid" 
+            gridTemplateColumns={isMobile ? '1fr' : 'repeat(auto-fill, minmax(280px, 1fr))'} 
+            gap={isMobile ? 2 : 3}
+          >
+            {filteredStudents.map((student) => (
+              <StudentCard
+                key={student.id}
+                student={student}
+                onStatusChange={handleStatusChange}
+                onActivitySelect={handleActivitySelect}
+                onNotesOpen={handleNotesOpen}
+                onResetStudent={handleResetStudent}
+              />
+            ))}
+          </Box>
+        </Fade>
+
+        {/* Watermark */}
+        <Box
+          sx={{
+            position: 'fixed',
+            bottom: 16,
+            right: 16,
+            bgcolor: 'rgba(28, 28, 30, 0.8)',
+            backdropFilter: 'blur(10px)',
+            borderRadius: 2,
+            px: 2,
+            py: 1,
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            zIndex: 1000,
+          }}
         >
-          {filteredStudents.map((student) => (
-            <StudentCard
-              key={student.id}
-              student={student}
-              onStatusChange={handleStatusChange}
-              onActivitySelect={handleActivitySelect}
-              onNotesOpen={handleNotesOpen}
-            />
-          ))}
+          <Typography 
+            variant="caption" 
+            sx={{ 
+              color: 'text.secondary',
+              fontWeight: 500,
+              fontSize: '0.7rem',
+            }}
+          >
+            Made by Abbas with ❤️
+          </Typography>
         </Box>
 
         <ActivityDialog
