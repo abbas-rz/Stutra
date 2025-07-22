@@ -148,10 +148,18 @@ class GoogleSheetsService {
         date: dateStr,
         timestamp: timestamp,
         status: student.status,
-        activity: student.activity || undefined,
-        logged_by: loggedBy || 'system',
-        notes: student.notes?.length > 0 ? student.notes[student.notes.length - 1] : undefined
+        logged_by: loggedBy || 'system'
       };
+
+      // Only add activity if it exists and is not empty
+      if (student.activity && student.activity.trim() !== '') {
+        attendanceLog.activity = student.activity;
+      }
+
+      // Only add notes if they exist
+      if (student.notes && student.notes.length > 0 && student.notes[student.notes.length - 1]) {
+        attendanceLog.notes = student.notes[student.notes.length - 1];
+      }
 
       // Calculate duration for washroom/activity if returning to present
       if (previousStatus && (previousStatus === 'washroom' || previousStatus === 'activity') && student.status === 'present') {
