@@ -45,7 +45,7 @@ import {
 } from '@mui/icons-material';
 import Fuse from 'fuse.js';
 import { NotesDialog } from './components/NotesDialog';
-import { AttendanceDialog } from './components/AttendanceDialog';
+import { SimpleAttendanceDialog } from './components/SimpleAttendanceDialog';
 import { googleSheetsService, type Student } from './services/googleSheets';
 
 // Apple-inspired theme with rounded corners and soft shadows
@@ -429,16 +429,18 @@ function StudentCard({ student, onStatusChange, onActivitySelect, onNotesOpen, o
                 size="small"
                 sx={{
                   transform: isMobile ? 'scale(0.7)' : 'scale(0.8)',
+                  mb: isMobile ? 0.2 : 0.3,
                 }}
               />
               <Typography 
                 variant="caption" 
                 color={isPresent ? 'success.main' : 'error.main'}
                 sx={{ 
-                  fontSize: isMobile ? '0.6rem' : '0.7rem', 
-                  fontWeight: 700, 
-                  mt: isMobile ? -1 : -0.5,
-                  lineHeight: 1
+                  fontSize: isMobile ? '0.55rem' : '0.65rem', 
+                  fontWeight: 600, 
+                  lineHeight: 1,
+                  textAlign: 'center',
+                  minWidth: isMobile ? '30px' : '35px',
                 }}
               >
                 {isPresent ? 'Present' : 'Absent'}
@@ -1037,7 +1039,7 @@ export default function Stutra() {
                   },
                 }}
               >
-                {selectedSection === 'All' ? 'All Present' : `${selectedSection} Present`}
+                {selectedSection === 'All' ? 'Mark All Present' : `Mark ${selectedSection} Present`}
               </Button>
               <Button
                 variant="outlined"
@@ -1053,7 +1055,7 @@ export default function Stutra() {
                   },
                 }}
               >
-                Reports
+                Export CSV
               </Button>
             </Box>
           </Box>
@@ -1122,7 +1124,7 @@ export default function Stutra() {
           onDeleteNote={handleDeleteNote}
         />
 
-        <AttendanceDialog
+        <SimpleAttendanceDialog
           open={attendanceDialogOpen}
           onClose={() => setAttendanceDialogOpen(false)}
           sections={sections}
