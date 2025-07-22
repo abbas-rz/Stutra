@@ -13,6 +13,21 @@ export interface Student {
   notes: string[];
 }
 
+export interface AttendanceLog {
+  id: string;
+  student_id: number;
+  student_name: string;
+  admission_number: string;
+  section: string;
+  date: string; // YYYY-MM-DD format
+  timestamp: number;
+  status: 'present' | 'absent' | 'washroom' | 'activity' | 'bunking';
+  activity?: string;
+  duration_minutes?: number; // For washroom/activity tracking
+  logged_by?: string; // User who made the change
+  notes?: string;
+}
+
 // Firebase configuration (replace with your own)
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "demo-key",
@@ -86,7 +101,7 @@ class GoogleSheetsService {
     }
   }
 
-  async updateStudent(student: Student): Promise<boolean> {
+  async updateStudentWithLog(student: Student, previousStatus?: string, loggedBy?: string): Promise<boolean> {
     if (!this.initialized || !this.database) {
       console.warn('Firebase not initialized, changes not saved');
       return false;
@@ -95,11 +110,203 @@ class GoogleSheetsService {
     try {
       const studentRef = ref(this.database, `students/${student.id}`);
       await set(studentRef, student);
+      
+      // Log the attendance change
+      await this.logAttendance(student, previousStatus, loggedBy);
+      
       console.log(`Student ${student.name} updated successfully`);
       return true;
     } catch (error) {
       console.error('Failed to update student in Firebase:', error);
       return false;
+    }
+  }
+
+  async updateStudent(student: Student): Promise<boolean> {
+    return this.updateStudentWithLog(student);
+  }
+
+  async logAttendance(student: Student, previousStatus?: string, loggedBy?: string): Promise<boolean> {
+    if (!this.initialized || !this.database) {
+      console.warn('Firebase not initialized, attendance not logged');
+      return false;
+    }
+
+    try {
+      const now = new Date();
+      const dateStr = now.toISOString().split('T')[0]; // YYYY-MM-DD format
+      const timestamp = now.getTime();
+      
+      const logId = `${student.id}_${timestamp}`;
+      
+      const attendanceLog: AttendanceLog = {
+        id: logId,
+        student_id: student.id,
+        student_name: student.name,
+        admission_number: student.admission_number,
+        section: student.section,
+        date: dateStr,
+        timestamp: timestamp,
+        status: student.status,
+        activity: student.activity || undefined,
+        logged_by: loggedBy || 'system',
+        notes: student.notes?.length > 0 ? student.notes[student.notes.length - 1] : undefined
+      };
+
+      // Calculate duration for washroom/activity if returning to present
+      if (previousStatus && (previousStatus === 'washroom' || previousStatus === 'activity') && student.status === 'present') {
+        // Try to find the last log entry for this student with the previous status
+        const logsRef = ref(this.database, 'attendance_logs');
+        const snapshot = await get(logsRef);
+        if (snapshot.exists()) {
+          const logs = Object.values(snapshot.val()) as AttendanceLog[];
+          const lastLog = logs
+            .filter(log => log.student_id === student.id && log.status === previousStatus)
+            .sort((a, b) => b.timestamp - a.timestamp)[0];
+          
+          if (lastLog) {
+            attendanceLog.duration_minutes = Math.round((timestamp - lastLog.timestamp) / (1000 * 60));
+          }
+        }
+      }
+
+      const attendanceRef = ref(this.database, `attendance_logs/${logId}`);
+      await set(attendanceRef, attendanceLog);
+      
+      console.log(`Attendance logged for ${student.name}: ${student.status}`);
+      return true;
+    } catch (error) {
+      console.error('Failed to log attendance:', error);
+      return false;
+    }
+  }
+
+  async getAttendanceLogs(startDate?: string, endDate?: string, section?: string): Promise<AttendanceLog[]> {
+    if (!this.initialized || !this.database) {
+      console.warn('Firebase not initialized');
+      return [];
+    }
+
+    try {
+      const logsRef = ref(this.database, 'attendance_logs');
+      const snapshot = await get(logsRef);
+      
+      if (!snapshot.exists()) {
+        return [];
+      }
+
+      let logs = Object.values(snapshot.val()) as AttendanceLog[];
+      
+      // Filter by date range
+      if (startDate) {
+        logs = logs.filter(log => log.date >= startDate);
+      }
+      if (endDate) {
+        logs = logs.filter(log => log.date <= endDate);
+      }
+      
+      // Filter by section
+      if (section && section !== 'All') {
+        logs = logs.filter(log => log.section === section);
+      }
+      
+      // Sort by timestamp (newest first)
+      return logs.sort((a, b) => b.timestamp - a.timestamp);
+    } catch (error) {
+      console.error('Failed to get attendance logs:', error);
+      return [];
+    }
+  }
+
+  async exportAttendanceToCSV(startDate?: string, endDate?: string, section?: string): Promise<string> {
+    try {
+      const logs = await this.getAttendanceLogs(startDate, endDate, section);
+      
+      if (logs.length === 0) {
+        throw new Error('No attendance data found for the specified criteria');
+      }
+
+      // CSV headers
+      const headers = [
+        'Date',
+        'Time',
+        'Student Name',
+        'Admission Number',
+        'Section',
+        'Status',
+        'Activity',
+        'Duration (minutes)',
+        'Notes',
+        'Logged By'
+      ];
+
+      // Convert logs to CSV rows
+      const rows = logs.map(log => {
+        const date = new Date(log.timestamp);
+        return [
+          log.date,
+          date.toLocaleTimeString(),
+          log.student_name,
+          log.admission_number,
+          log.section,
+          log.status,
+          log.activity || '',
+          log.duration_minutes || '',
+          log.notes || '',
+          log.logged_by || 'system'
+        ];
+      });
+
+      // Combine headers and rows
+      const csvContent = [headers, ...rows]
+        .map(row => row.map(field => `"${field}"`).join(','))
+        .join('\n');
+
+      return csvContent;
+    } catch (error) {
+      console.error('Failed to export attendance to CSV:', error);
+      throw error;
+    }
+  }
+
+  async getDailySummary(date: string, section?: string): Promise<{
+    total: number;
+    present: number;
+    absent: number;
+    washroom: number;
+    activity: number;
+    bunking: number;
+  }> {
+    try {
+      const logs = await this.getAttendanceLogs(date, date, section);
+      
+      // Get the latest status for each student on this date
+      const studentStatuses = new Map<number, { status: string; timestamp: number }>();
+      
+      logs.forEach(log => {
+        const existing = studentStatuses.get(log.student_id);
+        if (!existing || log.timestamp > existing.timestamp) {
+          studentStatuses.set(log.student_id, { status: log.status, timestamp: log.timestamp });
+        }
+      });
+
+      const statusCounts = {
+        total: studentStatuses.size,
+        present: 0,
+        absent: 0,
+        washroom: 0,
+        activity: 0,
+        bunking: 0
+      };
+
+      studentStatuses.forEach(({ status }) => {
+        statusCounts[status as keyof typeof statusCounts]++;
+      });
+
+      return statusCounts;
+    } catch (error) {
+      console.error('Failed to get daily summary:', error);
+      return { total: 0, present: 0, absent: 0, washroom: 0, activity: 0, bunking: 0 };
     }
   }
 

@@ -40,10 +40,12 @@ import {
   Note,
   RestartAlt,
   ExpandMore,
-  ExpandLess
+  ExpandLess,
+  Analytics
 } from '@mui/icons-material';
 import Fuse from 'fuse.js';
 import { NotesDialog } from './components/NotesDialog';
+import { AttendanceDialog } from './components/AttendanceDialog';
 import { googleSheetsService, type Student } from './services/googleSheets';
 
 // Apple-inspired theme with rounded corners and soft shadows
@@ -267,9 +269,10 @@ interface StudentCardProps {
   onActivitySelect: (studentId: number) => void;
   onNotesOpen: (studentId: number) => void;
   onResetStudent: (studentId: number) => void;
+  isMobile?: boolean;
 }
 
-function StudentCard({ student, onStatusChange, onActivitySelect, onNotesOpen, onResetStudent }: StudentCardProps) {
+function StudentCard({ student, onStatusChange, onActivitySelect, onNotesOpen, onResetStudent, isMobile }: StudentCardProps) {
   const [timeRemaining, setTimeRemaining] = useState('');
   const [notesExpanded, setNotesExpanded] = useState(false);
   const statusInfo = statusConfig[student.status];
@@ -328,85 +331,115 @@ function StudentCard({ student, onStatusChange, onActivitySelect, onNotesOpen, o
         height: '100%', 
         display: 'flex', 
         flexDirection: 'column',
-        transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
-        opacity: isPresent ? 1 : 0.7,
+        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+        opacity: isPresent ? 1 : 0.6,
+        transform: isPresent ? 'none' : 'scale(0.98)',
         '&:hover': {
-          transform: 'translateY(-2px)',
-          boxShadow: '0 8px 25px rgba(0, 0, 0, 0.3)',
+          transform: isPresent ? 'translateY(-4px) scale(1.02)' : 'translateY(-2px) scale(0.99)',
+          boxShadow: isPresent 
+            ? '0 12px 40px rgba(0, 122, 255, 0.25), 0 4px 12px rgba(0, 0, 0, 0.15)' 
+            : '0 8px 24px rgba(0, 0, 0, 0.2)',
         },
+        border: '1px solid',
+        borderColor: isPresent ? 'rgba(0, 122, 255, 0.2)' : 'rgba(255, 255, 255, 0.05)',
       }}
     >
-      <CardContent sx={{ flexGrow: 1, p: 2 }}>
-        {/* Header with Avatar, Student Info, and Present/Absent Toggle */}
-        <Box display="flex" alignItems="center" mb={1.5}>
+      <CardContent sx={{ flexGrow: 1, p: 3 }}>
+        {/* Header with Avatar, Student Info, and Controls - Mobile Optimized */}
+        <Box display="flex" alignItems="center" mb={1}>
           <Avatar 
             sx={{ 
-              width: 44, 
-              height: 44, 
-              mr: 1.5, 
+              width: isMobile ? 36 : 48, 
+              height: isMobile ? 36 : 48, 
+              mr: isMobile ? 1.5 : 2, 
               bgcolor: isPresent ? 'primary.main' : 'rgba(255, 255, 255, 0.3)',
-              boxShadow: isPresent ? '0 2px 10px rgba(0, 122, 255, 0.3)' : 'none',
+              boxShadow: isPresent ? '0 2px 8px rgba(0, 122, 255, 0.3)' : 'none',
+              border: '1px solid',
+              borderColor: isPresent ? 'primary.main' : 'rgba(255, 255, 255, 0.1)',
             }}
           >
-            <Person />
+            <Person fontSize={isMobile ? 'small' : 'medium'} />
           </Avatar>
-          <Box flexGrow={1}>
-            <Box display="flex" alignItems="center" justifyContent="space-between">
-              <Typography variant="subtitle2" fontWeight="bold" noWrap sx={{ flex: 1 }}>
-                {student.name}
-              </Typography>
-              <IconButton
-                size="small"
-                onClick={() => onResetStudent(student.id)}
-                sx={{
-                  bgcolor: 'rgba(118, 118, 128, 0.12)',
-                  color: 'text.secondary',
-                  width: 24,
-                  height: 24,
-                  ml: 1,
-                  '&:hover': {
-                    bgcolor: 'rgba(255, 255, 255, 0.1)',
-                    color: 'text.primary',
-                  },
-                }}
-              >
-                <RestartAlt sx={{ fontSize: '0.8rem' }} />
-              </IconButton>
-            </Box>
-            <Typography variant="caption" color="text.secondary">
-              {student.admission_number}
+          
+          <Box flexGrow={1} mr={1}>
+            <Typography 
+              variant={isMobile ? 'body2' : 'subtitle2'} 
+              fontWeight="bold" 
+              noWrap 
+              sx={{ mb: 0.2, lineHeight: 1.2 }}
+            >
+              {student.name}
+            </Typography>
+            <Typography 
+              variant={isMobile ? 'caption' : 'caption'} 
+              color="text.secondary" 
+              sx={{ fontSize: isMobile ? '0.65rem' : '0.75rem', lineHeight: 1 }}
+            >
+              #{student.admission_number}
             </Typography>
           </Box>
-          <Box display="flex" alignItems="center" gap={1}>
+
+          {/* Right side controls - compact for mobile */}
+          <Box display="flex" alignItems="center" gap={isMobile ? 0.5 : 1}>
             <IconButton
               size="small"
               onClick={() => onNotesOpen(student.id)}
               sx={{
-                bgcolor: student.notes && student.notes.length > 0 ? 'warning.main' : 'transparent',
+                bgcolor: student.notes && student.notes.length > 0 ? 'warning.main' : 'rgba(118, 118, 128, 0.12)',
                 color: student.notes && student.notes.length > 0 ? 'black' : 'text.secondary',
                 '&:hover': {
                   bgcolor: 'warning.main',
                   color: 'black',
+                  transform: 'scale(1.05)',
                 },
-                width: 32,
-                height: 32,
+                width: isMobile ? 28 : 32,
+                height: isMobile ? 28 : 32,
+                transition: 'all 0.2s ease-in-out',
               }}
             >
               <Note fontSize="small" />
             </IconButton>
-            <Box display="flex" flexDirection="column" alignItems="center">
+            
+            <IconButton
+              size="small"
+              onClick={() => onResetStudent(student.id)}
+              sx={{
+                bgcolor: 'rgba(255, 69, 58, 0.15)',
+                color: 'error.main',
+                border: '1px solid rgba(255, 69, 58, 0.3)',
+                width: isMobile ? 28 : 32,
+                height: isMobile ? 28 : 32,
+                '&:hover': {
+                  bgcolor: 'error.main',
+                  color: 'white',
+                  transform: 'scale(1.05)',
+                  boxShadow: '0 4px 12px rgba(255, 69, 58, 0.4)',
+                },
+                transition: 'all 0.2s ease-in-out',
+              }}
+            >
+              <RestartAlt fontSize="small" />
+            </IconButton>
+
+            {/* Present/Absent toggle - inline for mobile */}
+            <Box display="flex" flexDirection="column" alignItems="center" ml={0.5}>
               <Switch
                 checked={isPresent}
                 onChange={(e) => handlePresentToggle(e.target.checked)}
                 size="small"
                 sx={{
-                  transform: 'scale(0.8)',
+                  transform: isMobile ? 'scale(0.7)' : 'scale(0.8)',
                 }}
               />
               <Typography 
                 variant="caption" 
                 color={isPresent ? 'success.main' : 'error.main'}
-                sx={{ fontSize: '0.65rem', fontWeight: 600, mt: -0.5 }}
+                sx={{ 
+                  fontSize: isMobile ? '0.6rem' : '0.7rem', 
+                  fontWeight: 700, 
+                  mt: isMobile ? -1 : -0.5,
+                  lineHeight: 1
+                }}
               >
                 {isPresent ? 'Present' : 'Absent'}
               </Typography>
@@ -414,19 +447,26 @@ function StudentCard({ student, onStatusChange, onActivitySelect, onNotesOpen, o
           </Box>
         </Box>
 
-        {/* Status Chip and Timer */}
-        <Box display="flex" alignItems="center" justifyContent="space-between" mb={1.5}>
+        {/* Status Chip and Timer - Enhanced styling */}
+        <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
           <Chip
             icon={<StatusIcon />}
             label={statusInfo.label}
-            size="small"
+            size="medium"
             sx={{ 
               bgcolor: statusInfo.color,
               color: 'white',
-              fontSize: '0.75rem',
-              fontWeight: 600,
-              boxShadow: `0 2px 8px ${statusInfo.color}40`,
+              fontSize: '0.8rem',
+              fontWeight: 700,
+              boxShadow: `0 4px 12px ${statusInfo.color}50`,
               opacity: isPresent ? 1 : 0.5,
+              border: '2px solid',
+              borderColor: statusInfo.color,
+              '&:hover': {
+                transform: 'scale(1.05)',
+                boxShadow: `0 6px 16px ${statusInfo.color}60`,
+              },
+              transition: 'all 0.2s ease-in-out',
             }}
           />
           {timeRemaining && isPresent && (
@@ -434,14 +474,22 @@ function StudentCard({ student, onStatusChange, onActivitySelect, onNotesOpen, o
               variant="caption" 
               color="primary"
               sx={{ 
-                bgcolor: 'rgba(0, 122, 255, 0.1)',
-                px: 1,
-                py: 0.5,
-                borderRadius: 1,
-                fontWeight: 600,
+                bgcolor: 'rgba(0, 122, 255, 0.15)',
+                px: 1.5,
+                py: 0.8,
+                borderRadius: 2,
+                fontWeight: 700,
+                fontSize: '0.8rem',
+                border: '1px solid rgba(0, 122, 255, 0.3)',
+                animation: 'pulse 2s infinite',
+                '@keyframes pulse': {
+                  '0%': { opacity: 1 },
+                  '50%': { opacity: 0.7 },
+                  '100%': { opacity: 1 },
+                },
               }}
             >
-              {timeRemaining}
+              ⏱️ {timeRemaining}
             </Typography>
           )}
         </Box>
@@ -546,39 +594,55 @@ function StudentCard({ student, onStatusChange, onActivitySelect, onNotesOpen, o
           </Box>
         )}
 
-        {/* Action Buttons */}
-        <Box display="flex" gap={0.5} flexWrap="wrap">
+        {/* Action Buttons - Enhanced layout */}
+        <Box display="flex" gap={1} flexWrap="wrap" justifyContent="flex-start">
           {Object.entries(statusConfig)
             .filter(([status]) => status !== 'present' && status !== 'absent') // Remove present/absent buttons
             .map(([status, config]) => {
             const Icon = config.icon;
             const isDisabled = !isPresent;
+            const isActive = student.status === status;
             return (
               <IconButton
                 key={status}
-                size="small"
+                size="medium"
                 onClick={() => handleStatusClick(status as Student['status'])}
                 disabled={isDisabled}
                 sx={{
-                  bgcolor: student.status === status ? config.color : 'rgba(118, 118, 128, 0.12)',
-                  color: student.status === status ? 'white' : config.color,
-                  border: student.status === status ? 'none' : `1px solid ${config.color}40`,
+                  bgcolor: isActive ? config.color : 'rgba(118, 118, 128, 0.12)',
+                  color: isActive ? 'white' : config.color,
+                  border: `2px solid ${isActive ? config.color : `${config.color}40`}`,
                   opacity: isDisabled ? 0.3 : 1,
                   '&:hover': !isDisabled ? {
                     bgcolor: config.color,
                     color: 'white',
-                    transform: 'scale(1.05)',
-                    boxShadow: `0 4px 12px ${config.color}40`,
+                    transform: 'translateY(-2px) scale(1.05)',
+                    boxShadow: `0 6px 20px ${config.color}50`,
+                    borderColor: config.color,
                   } : {},
                   '&.Mui-disabled': {
                     bgcolor: 'rgba(118, 118, 128, 0.06)',
                     color: 'rgba(118, 118, 128, 0.3)',
-                    border: '1px solid rgba(118, 118, 128, 0.1)',
+                    border: '2px solid rgba(118, 118, 128, 0.1)',
                   },
                   minWidth: 0,
-                  width: 36,
-                  height: 36,
-                  transition: 'all 0.2s ease-in-out',
+                  width: 42,
+                  height: 42,
+                  borderRadius: 2,
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  position: 'relative',
+                  '&::after': isActive ? {
+                    content: '""',
+                    position: 'absolute',
+                    top: -2,
+                    right: -2,
+                    width: 8,
+                    height: 8,
+                    bgcolor: 'success.main',
+                    borderRadius: '50%',
+                    border: '2px solid',
+                    borderColor: 'background.paper',
+                  } : {},
                 }}
               >
                 <Icon fontSize="small" />
@@ -684,6 +748,7 @@ export default function Stutra() {
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
   const [sections, setSections] = useState<string[]>([]);
   const [selectedSection, setSelectedSection] = useState<string>('All');
+  const [attendanceDialogOpen, setAttendanceDialogOpen] = useState(false);
   const isMobile = useMediaQuery('(max-width:600px)');
 
   // Load students from Google Sheets on component mount
@@ -749,6 +814,10 @@ export default function Stutra() {
   }, [searchTerm, students, selectedSection]);
 
   const handleStatusChange = async (studentId: number, status: Student['status'], activity: string, timerEnd: number | null) => {
+    // Get previous status for logging
+    const currentStudent = students.find(s => s.id === studentId);
+    const previousStatus = currentStudent?.status;
+
     // Update local state immediately for instant feedback
     setStudents(prev => {
       const updated = prev.map(student => 
@@ -759,12 +828,12 @@ export default function Stutra() {
       return updated;
     });
 
-    // Update in Firebase asynchronously
+    // Update in Firebase asynchronously with logging
     try {
       const updatedStudent = students.find(s => s.id === studentId);
       if (updatedStudent) {
         const studentToUpdate = { ...updatedStudent, status, activity, timer_end: timerEnd };
-        await googleSheetsService.updateStudent(studentToUpdate);
+        await googleSheetsService.updateStudentWithLog(studentToUpdate, previousStatus);
       }
     } catch (error) {
       console.error('Failed to update student in database:', error);
@@ -954,21 +1023,39 @@ export default function Stutra() {
               }}
               size="small"
             />
-            <Button
-              variant="contained"
-              onClick={markAllPresent}
-              startIcon={<Refresh />}
-              sx={{ 
-                whiteSpace: 'nowrap',
-                minWidth: isMobile ? 'auto' : 140,
-                background: 'linear-gradient(45deg, #30D158, #32D74B)',
-                '&:hover': {
-                  background: 'linear-gradient(45deg, #28B946, #30D158)',
-                },
-              }}
-            >
-              {selectedSection === 'All' ? 'All Present' : `${selectedSection} Present`}
-            </Button>
+            <Box display="flex" gap={1}>
+              <Button
+                variant="contained"
+                onClick={markAllPresent}
+                startIcon={<Refresh />}
+                sx={{ 
+                  whiteSpace: 'nowrap',
+                  minWidth: isMobile ? 'auto' : 140,
+                  background: 'linear-gradient(45deg, #30D158, #32D74B)',
+                  '&:hover': {
+                    background: 'linear-gradient(45deg, #28B946, #30D158)',
+                  },
+                }}
+              >
+                {selectedSection === 'All' ? 'All Present' : `${selectedSection} Present`}
+              </Button>
+              <Button
+                variant="outlined"
+                onClick={() => setAttendanceDialogOpen(true)}
+                startIcon={<Analytics />}
+                sx={{ 
+                  whiteSpace: 'nowrap',
+                  borderColor: 'primary.main',
+                  color: 'primary.main',
+                  '&:hover': {
+                    borderColor: 'primary.dark',
+                    bgcolor: 'rgba(0, 122, 255, 0.1)',
+                  },
+                }}
+              >
+                Reports
+              </Button>
+            </Box>
           </Box>
         </Box>
 
@@ -987,6 +1074,7 @@ export default function Stutra() {
                 onActivitySelect={handleActivitySelect}
                 onNotesOpen={handleNotesOpen}
                 onResetStudent={handleResetStudent}
+                isMobile={isMobile}
               />
             ))}
           </Box>
@@ -1032,6 +1120,13 @@ export default function Stutra() {
           notes={selectedStudent?.notes || []}
           onAddNote={handleAddNote}
           onDeleteNote={handleDeleteNote}
+        />
+
+        <AttendanceDialog
+          open={attendanceDialogOpen}
+          onClose={() => setAttendanceDialogOpen(false)}
+          sections={sections}
+          selectedSection={selectedSection}
         />
       </Container>
     </ThemeProvider>

@@ -10,9 +10,14 @@ A modern, Apple-inspired student tracking application built for schools and clas
 - **⏰ Smart Timer**: Automatic 12-minute washroom timer that alerts you when time is up
 - **📝 Student Notes**: Add private notes about each student that only teachers can see
 - **🔍 Quick Search**: Find any student instantly by typing their name or admission number
-- **📱 Works Everywhere**: Use on computers, tablets, or phones
+- **� Attendance Reports**: Generate detailed attendance reports with CSV export
+- **📈 Daily Analytics**: View daily summaries and attendance statistics
+- **🐍 Python Management**: Easy-to-use Python script for bulk student management
+- **�📱 Works Everywhere**: Use on computers, tablets, or phones
 - **☁️ Cloud Sync**: All data is automatically saved to the cloud (Firebase)
 - **🎨 Beautiful Design**: Dark theme that's easy on the eyes
+- **🔄 Real-time Updates**: See changes instantly across all devices
+- **📥 Data Export**: Export attendance logs with dates for record-keeping
 
 ## 🚀 Quick Setup Guide for School Administrators
 
@@ -156,6 +161,45 @@ Firebase will store all your student data safely in the cloud.
 - All changes are automatically saved to Firebase
 - Data persists between sessions
 - Access from any device with the same login
+- **Attendance Logging**: Every status change is logged with timestamps for reporting
+- **CSV Export**: Export detailed attendance reports for analysis and record-keeping
+
+## 📊 New Features: Attendance Reports & Analytics
+
+### Attendance Reporting:
+1. **Click the "Reports" button** in the top navigation
+2. **Select date range** for the report period
+3. **Choose section** or select "All" for school-wide reports
+4. **View daily summary** with status breakdowns
+5. **Export to CSV** for detailed analysis
+
+### CSV Export includes:
+- Date and time of each status change
+- Student information (name, admission number, section)
+- Status changes (present, absent, washroom, activity, bunking)
+- Activity details and duration tracking
+- Notes and who made the changes
+- Perfect for school records and parent meetings
+
+## 🐍 Python Student Management
+
+For bulk student management, use the included Python script:
+
+### Setup:
+```bash
+cd scripts
+pip install -r requirements.txt
+python add_students.py
+```
+
+### Features:
+- **Bulk Import**: Add students from CSV or Excel files
+- **Student Management**: Edit, update, or delete student records
+- **Data Export**: Export current student data
+- **Section Management**: Organize students by class sections
+- **Validation**: Ensures data integrity and proper formatting
+
+See `scripts/README.md` for detailed setup instructions.
 
 ## 🔧 Customization
 
