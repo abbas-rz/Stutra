@@ -1,5 +1,3 @@
-// File: main.tsx (Entry Point)
-
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { App } from './components/App';
@@ -7,6 +5,7 @@ import './index.css';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import LoginPage from './components/auth/LoginPage';
 import RegisterPage from './components/auth/RegisterPage';
+import GuardPage from './pages/GuardPage';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -15,6 +14,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/guard" element={<GuardPage />} />
         <Route path="/" element={<ProtectedRoute><App /></ProtectedRoute>} />
         <Route path="/dashboard" element={<ProtectedRoute><App /></ProtectedRoute>} />
       </Routes>
