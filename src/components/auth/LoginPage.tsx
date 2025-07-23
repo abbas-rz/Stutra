@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authService } from '../../services/auth';
 import { TextField, Button, Typography, Box, Alert } from '@mui/material';
@@ -14,7 +14,7 @@ export default function LoginPage() {
       setError('');
       await authService.login({ email, password });
       navigate('/'); // Redirect to the main page
-    } catch (err) {
+    } catch {
       setError('Invalid email or password.');
     }
   };

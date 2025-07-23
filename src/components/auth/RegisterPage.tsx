@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authService } from '../../services/auth';
 import { TextField, Button, Typography, Box, Alert, Checkbox, FormControlLabel } from '@mui/material';
@@ -19,7 +19,7 @@ export default function RegisterPage() {
       setSuccess('');
       await authService.createTeacher({ email, name, password, sections, isAdmin });
       setSuccess('Account created successfully! You can now log in.');
-    } catch (err) {
+    } catch {
       setError('Failed to create account. Please try again.');
     }
   };

@@ -6,8 +6,6 @@ interface ProtectedRouteProps {
   children: React.ReactElement;
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-  return authService.isAuthenticated() ? children : <Navigate to="/login" />;
-};
-
-export default ProtectedRoute;
+export function ProtectedRoute({ children }: ProtectedRouteProps) {
+  return authService.isAuthenticated() ? children : <Navigate to="/login" replace />;
+}

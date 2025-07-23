@@ -25,5 +25,6 @@
 
     "types": ["react"]
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": ["**/*.old.tsx"]
 }
