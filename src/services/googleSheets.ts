@@ -549,6 +549,35 @@ class GoogleSheetsService {
       return [];
     }
   }
+
+  async resetIndividualStudent(studentId: number): Promise<void> {
+    if (!this.initialized || !this.database) {
+      console.warn('Firebase not initialized');
+      return;
+    }
+
+    try {
+      const studentRef = ref(this.database, `students/${studentId}`);
+      const snapshot = await get(studentRef);
+      
+      if (snapshot.exists()) {
+        const student = snapshot.val() as Student;
+        const resetStudent: Student = {
+          ...student,
+          status: 'present',
+          activity: '',
+          timer_end: null,
+          notes: []
+        };
+        
+        await set(studentRef, resetStudent);
+        console.log(`Student ${studentId} reset successfully`);
+      }
+    } catch (error) {
+      console.error('Failed to reset student:', error);
+      throw error;
+    }
+  }
 }
 
 export const googleSheetsService = new GoogleSheetsService();

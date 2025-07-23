@@ -55,7 +55,8 @@ class AuthService {
       await set(ref(this.database, `teachers/${teacherId}`), teacher);
       
       // Return teacher without password
-      const { password: _, ...teacherWithoutPassword } = teacher;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { password: _password, ...teacherWithoutPassword } = teacher;
       return { ...teacherWithoutPassword, password: '' } as Teacher;
     } catch (error) {
       console.error('Error creating teacher:', error);
@@ -90,6 +91,7 @@ class AuthService {
       }));
 
       // Return teacher without password
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { password, ...teacherWithoutPassword } = teacher;
       return { ...teacherWithoutPassword, password: '' } as Teacher;
     } catch (error) {
@@ -151,6 +153,23 @@ class AuthService {
     }
   }
 
+  async getTeacherById(teacherId: string): Promise<Teacher | null> {
+    try {
+      const teacherRef = ref(this.database, `teachers/${teacherId}`);
+      const snapshot = await get(teacherRef);
+      
+      if (snapshot.exists()) {
+        const teacher = snapshot.val();
+        return { ...teacher, id: teacherId };
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Error getting teacher by ID:', error);
+      throw error;
+    }
+  }
+
   async getAllTeachers(): Promise<Teacher[]> {
     try {
       const teachersRef = ref(this.database, 'teachers');
@@ -158,8 +177,8 @@ class AuthService {
       
       if (snapshot.exists()) {
         const teachers = snapshot.val();
-        return Object.entries(teachers).map(([id, teacher]: [string, any]) => ({
-          ...teacher,
+        return Object.entries(teachers).map(([id, teacher]) => ({
+          ...(teacher as Teacher),
           id,
           password: '', // Don't return passwords
         }));
@@ -212,6 +231,42 @@ class AuthService {
       }
     } catch (error) {
       console.error('Error initializing default admin:', error);
+    }
+  }
+
+  async getLoggedInTeacherId(): Promise<string> {
+    if (this.currentTeacher) {
+      return this.currentTeacher.id;
+    }
+    
+    // Try to get from localStorage
+    const teacherData = localStorage.getItem('stutra_teacher');
+    if (teacherData) {
+      const teacher = JSON.parse(teacherData) as Teacher;
+      this.currentTeacher = teacher;
+      return teacher.id;
+    }
+    
+    throw new Error('No teacher logged in');
+  }
+
+  async getSectionsForTeacher(teacherId: string): Promise<string[]> {
+    try {
+      const teacher = await this.getTeacherById(teacherId);
+      if (!teacher) {
+        throw new Error('Teacher not found');
+      }
+      
+      // If admin, return all available sections
+      if (teacher.isAdmin) {
+        // Return all sections - in a real implementation, this would come from a sections table
+        return ['XI-A', 'XI-B', 'XI-C', 'XI-D', 'XI-E', 'XI-F', 'XI-G', 'XI-H', 'XI-I', 'XI-J'];
+      }
+      
+      return teacher.sections;
+    } catch (error) {
+      console.error('Error getting sections for teacher:', error);
+      throw error;
     }
   }
 }
