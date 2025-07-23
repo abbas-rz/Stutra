@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   ThemeProvider,
   CssBaseline,
@@ -41,9 +41,31 @@ function fuzzyMatch(searchTerm: string, text: string): number {
 
 interface GuardStudentCardProps {
   student: Student;
+  onStudentUpdate?: (studentId: number, newStatus: Student['status']) => void;
 }
 
-function GuardStudentCard({ student }: GuardStudentCardProps) {
+function GuardStudentCard({ student, onStudentUpdate }: GuardStudentCardProps) {
+  const [currentTime, setCurrentTime] = useState(Date.now());
+
+  // Update timer every second
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Check if timer is expired and update status
+  useEffect(() => {
+    if (student.status === 'washroom' && student.timer_end && student.timer_end <= currentTime) {
+      // Timer expired, should revert to present status
+      if (onStudentUpdate) {
+        onStudentUpdate(student.id, 'present');
+      }
+    }
+  }, [currentTime, student.status, student.timer_end, student.id, onStudentUpdate]);
+
   const getStatusColor = (status: string): 'warning' | 'success' | 'error' | 'info' | 'default' => {
     switch (status) {
       case 'washroom':
@@ -81,8 +103,7 @@ function GuardStudentCard({ student }: GuardStudentCardProps) {
   const formatTimer = (timerEnd: number | null) => {
     if (!timerEnd) return null;
     
-    const now = Date.now();
-    const timeLeft = timerEnd - now;
+    const timeLeft = timerEnd - currentTime;
     
     if (timeLeft <= 0) return 'EXPIRED';
     
@@ -92,14 +113,51 @@ function GuardStudentCard({ student }: GuardStudentCardProps) {
     return `${minutes}m ${seconds}s left`;
   };
 
+  const isTimerExpiringSoon = (timerEnd: number | null) => {
+    if (!timerEnd) return false;
+    const timeLeft = timerEnd - currentTime;
+    return timeLeft > 0 && timeLeft <= 2 * 60 * 1000; // 2 minutes or less
+  };
+
+  const isTimerExpired = (timerEnd: number | null) => {
+    if (!timerEnd) return false;
+    return timerEnd <= currentTime;
+  };
+
   return (
     <Card 
       sx={{ 
         mb: 2, 
         border: student.status === 'washroom' ? 2 : 1,
-        borderColor: student.status === 'washroom' ? 'warning.main' : 'grey.300',
-        backgroundColor: student.status === 'washroom' ? 'warning.light' : 'background.paper',
+        borderColor: student.status === 'washroom' 
+          ? isTimerExpired(student.timer_end) 
+            ? 'error.main'
+            : isTimerExpiringSoon(student.timer_end)
+            ? 'warning.main'
+            : 'warning.main'
+          : 'grey.300',
+        backgroundColor: student.status === 'washroom' 
+          ? isTimerExpired(student.timer_end)
+            ? 'error.light'
+            : isTimerExpiringSoon(student.timer_end)
+            ? 'warning.main'
+            : 'warning.light'
+          : 'background.paper',
         opacity: student.status === 'washroom' ? 1 : 0.8,
+        animation: isTimerExpiringSoon(student.timer_end) && !isTimerExpired(student.timer_end) 
+          ? 'pulse 2s infinite' 
+          : 'none',
+        '@keyframes pulse': {
+          '0%': {
+            boxShadow: '0 0 0 0 rgba(255, 193, 7, 0.4)',
+          },
+          '70%': {
+            boxShadow: '0 0 0 10px rgba(255, 193, 7, 0)',
+          },
+          '100%': {
+            boxShadow: '0 0 0 0 rgba(255, 193, 7, 0)',
+          },
+        },
       }}
     >
       <CardContent>
@@ -128,7 +186,9 @@ function GuardStudentCard({ student }: GuardStudentCardProps) {
             <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mt: 1, flexWrap: 'wrap' }}>
               <Chip
                 label={getStatusText(student.status)}
-                color={getStatusColor(student.status)}
+                color={student.status === 'washroom' && isTimerExpired(student.timer_end) 
+                  ? 'error' 
+                  : getStatusColor(student.status)}
                 icon={student.status === 'washroom' ? <SecurityOutlined /> : undefined}
                 size="small"
                 variant={student.status === 'washroom' ? 'filled' : 'outlined'}
@@ -137,10 +197,24 @@ function GuardStudentCard({ student }: GuardStudentCardProps) {
               {student.status === 'washroom' && student.timer_end && (
                 <Chip
                   label={formatTimer(student.timer_end)}
-                  color="warning"
+                  color={isTimerExpired(student.timer_end) 
+                    ? 'error' 
+                    : isTimerExpiringSoon(student.timer_end) 
+                    ? 'warning' 
+                    : 'success'}
                   icon={<AccessTimeOutlined />}
                   size="small"
                   variant="outlined"
+                  sx={{
+                    animation: isTimerExpiringSoon(student.timer_end) && !isTimerExpired(student.timer_end) 
+                      ? 'blink 1s infinite' 
+                      : 'none',
+                    '@keyframes blink': {
+                      '0%': { opacity: 1 },
+                      '50%': { opacity: 0.5 },
+                      '100%': { opacity: 1 },
+                    },
+                  }}
                 />
               )}
               
@@ -162,7 +236,26 @@ function GuardStudentCard({ student }: GuardStudentCardProps) {
 
 export default function GuardPage() {
   const [searchTerm, setSearchTerm] = useState('');
-  const { students, loading, error } = useStudents();
+  const [currentTime, setCurrentTime] = useState(Date.now());
+  const { students, loading, error, updateStudentStatus } = useStudents();
+
+  // Update current time every second for live timer updates
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Handle student status updates when timer expires
+  const handleStudentUpdate = useCallback(async (studentId: number, newStatus: Student['status']) => {
+    try {
+      await updateStudentStatus(studentId, newStatus);
+    } catch (err) {
+      console.error('Failed to update student status:', err);
+    }
+  }, [updateStudentStatus]);
 
   // Fuzzy search implementation
   const filteredStudents = useMemo(() => {
@@ -203,6 +296,12 @@ export default function GuardPage() {
   }, [students, searchTerm]);
 
   const washroomStudents = filteredStudents.filter((s: Student) => s.status === 'washroom');
+  const expiredStudents = washroomStudents.filter((s: Student) => 
+    s.timer_end && s.timer_end <= currentTime
+  );
+  const expiringSoonStudents = washroomStudents.filter((s: Student) => 
+    s.timer_end && s.timer_end > currentTime && s.timer_end <= currentTime + 2 * 60 * 1000
+  );
 
   if (loading) {
     return (
@@ -289,6 +388,30 @@ export default function GuardPage() {
           </Box>
         </Box>
 
+        {/* Expired Timer Alert */}
+        {expiredStudents.length > 0 && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            <Typography variant="subtitle1" gutterBottom>
+              🚨 URGENT: Washroom Timer Expired ({expiredStudents.length} students)
+            </Typography>
+            <Typography variant="body2">
+              These students have exceeded their washroom time limit: {expiredStudents.map(s => s.name).join(', ')}
+            </Typography>
+          </Alert>
+        )}
+
+        {/* Timer Expiring Soon Alert */}
+        {expiringSoonStudents.length > 0 && (
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            <Typography variant="subtitle1" gutterBottom>
+              ⏰ Timer Expiring Soon ({expiringSoonStudents.length} students)
+            </Typography>
+            <Typography variant="body2">
+              These students have less than 2 minutes remaining: {expiringSoonStudents.map(s => s.name).join(', ')}
+            </Typography>
+          </Alert>
+        )}
+
         {/* Washroom Alert */}
         {washroomStudents.length > 0 && (
           <Alert severity="warning" sx={{ mb: 3 }}>
@@ -315,7 +438,11 @@ export default function GuardPage() {
                 Students ({filteredStudents.length})
               </Typography>
               {filteredStudents.map((student) => (
-                <GuardStudentCard key={student.id} student={student} />
+                <GuardStudentCard 
+                  key={student.id} 
+                  student={student} 
+                  onStudentUpdate={handleStudentUpdate}
+                />
               ))}
             </>
           )}
