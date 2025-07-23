@@ -28,7 +28,7 @@ import {
   CheckCircle,
   Cancel,
 } from '@mui/icons-material';
-import { googleSheetsService } from '../services/API';
+import { googleSheetsService } from '../services/googleSheets';
 
 interface AttendanceDialogProps {
   open: boolean;

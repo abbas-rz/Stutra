@@ -49,6 +49,8 @@ export function useStudents(): UseStudentsResult {
     // Get previous status for logging
     const currentStudent = students.find(s => s.id === studentId);
     const previousStatus = currentStudent?.status;
+    
+    console.log(`🔄 useStudents: Updating student ${studentId} from ${previousStatus} to ${status}`);
 
     // Update local state immediately for instant feedback
     setStudents(prev => prev.map(student => 
@@ -58,13 +60,18 @@ export function useStudents(): UseStudentsResult {
     ));
 
     try {
-      const updatedStudent = students.find(s => s.id === studentId);
-      if (updatedStudent) {
-        const studentToUpdate = { ...updatedStudent, status, activity, timer_end: timerEnd };
+      // Don't rely on the old students array - create the updated student object directly
+      const currentStudent = students.find(s => s.id === studentId);
+      if (currentStudent) {
+        const studentToUpdate = { ...currentStudent, status, activity, timer_end: timerEnd };
+        console.log(`📤 useStudents: Calling updateStudentWithLog for ${currentStudent.name} with status: ${status}`);
         await googleSheetsService.updateStudentWithLog(studentToUpdate, previousStatus);
+        console.log(`✅ useStudents: Successfully updated ${currentStudent.name}`);
+      } else {
+        console.error(`❌ useStudents: Could not find student with ID ${studentId}`);
       }
     } catch (err) {
-      console.error('Failed to update student in database:', err);
+      console.error('❌ useStudents: Failed to update student in database:', err);
       // Revert local state on error
       await refreshStudents();
     }

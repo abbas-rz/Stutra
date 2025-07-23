@@ -8,6 +8,7 @@ export interface Student {
   activity: string;
   timer_end: number | null;
   notes: string[];
+  lastResetDate?: string; // YYYY-MM-DD format to track daily resets
 }
 
 export interface AttendanceLog {

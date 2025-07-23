@@ -328,8 +328,8 @@ class GoogleSheetsService {
 
       // Convert students to CSV rows
       const rows = studentsWithRollNumbers.map(student => {
-        // Get attendance from logs for this date, default to 'present' if no log found
-        const loggedStatus = studentStatuses.get(student.id) || 'present';
+        // Get attendance from logs for this date, default to 'absent' if no log found (daily reset system)
+        const loggedStatus = studentStatuses.get(student.id) || 'absent';
         const attendance = loggedStatus === 'absent' ? 'A' : 'P';
         
         return [
@@ -397,7 +397,7 @@ class GoogleSheetsService {
       const rows = studentsWithRollNumbers.map(student => {
         const dateColumns = dateRange.map(date => {
           const statusMap = attendanceByDate.get(date);
-          const loggedStatus = statusMap?.get(student.id) || 'present';
+          const loggedStatus = statusMap?.get(student.id) || 'absent'; // Default to absent with daily reset system
           return loggedStatus === 'absent' ? 'A' : 'P';
         });
         

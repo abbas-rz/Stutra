@@ -11,6 +11,7 @@ export interface Student {
   activity: string;
   timer_end: number | null;
   notes: string[];
+  lastResetDate?: string; // YYYY-MM-DD format to track daily resets
 }
 
 export interface AttendanceLog {
@@ -43,6 +44,31 @@ class GoogleSheetsService {
   private app: FirebaseApp | null = null;
   private database: Database | null = null;
   private initialized = false;
+  
+  // Helper method to get current date in YYYY-MM-DD format
+  private getCurrentDateString(): string {
+    const now = new Date();
+    return now.toISOString().split('T')[0];
+  }
+  
+  // Check if a student needs daily reset
+  private needsDailyReset(student: Student): boolean {
+    const today = this.getCurrentDateString();
+    return !student.lastResetDate || student.lastResetDate !== today;
+  }
+  
+  // Reset a student to default daily state
+  private resetStudentForNewDay(student: Student): Student {
+    const today = this.getCurrentDateString();
+    return {
+      ...student,
+      status: 'absent', // Default to absent at start of day
+      activity: '',
+      timer_end: null,
+      notes: [], // Clear notes for new day
+      lastResetDate: today,
+    };
+  }
   
   async initialize() {
     try {
@@ -88,10 +114,33 @@ class GoogleSheetsService {
       
       if (snapshot.exists()) {
         const data = snapshot.val();
-        return Object.values(data) as Student[];
+        let students = Object.values(data) as Student[];
+        
+        // Check if any students need daily reset
+        const studentsNeedingReset = students.filter(student => this.needsDailyReset(student));
+        
+        if (studentsNeedingReset.length > 0) {
+          console.log(`Performing daily reset for ${studentsNeedingReset.length} students`);
+          
+          // Reset students for new day
+          students = students.map(student => {
+            if (this.needsDailyReset(student)) {
+              return this.resetStudentForNewDay(student);
+            }
+            return student;
+          });
+          
+          // Save the reset students back to database
+          await this.saveAllStudents(students);
+          
+          // Log the daily reset
+          await this.logDailyReset(studentsNeedingReset.length);
+        }
+        
+        return students;
       } else {
         console.log('No students data found, initializing with XI Raman students');
-        const students = this.getXIRamanStudents();
+        const students = this.getXIRamanStudents().map(student => this.resetStudentForNewDay(student));
         await this.saveAllStudents(students);
         return students;
       }
@@ -103,21 +152,25 @@ class GoogleSheetsService {
 
   async updateStudentWithLog(student: Student, previousStatus?: string, loggedBy?: string): Promise<boolean> {
     if (!this.initialized || !this.database) {
-      console.warn('Firebase not initialized, changes not saved');
+      console.warn('❌ Firebase not initialized, changes not saved');
+      console.log('🔍 Firebase state:', { initialized: this.initialized, database: !!this.database });
       return false;
     }
 
     try {
+      console.log(`🔄 Updating student ${student.name} (ID: ${student.id}): ${previousStatus} -> ${student.status}`);
+      
       const studentRef = ref(this.database, `students/${student.id}`);
       await set(studentRef, student);
       
       // Log the attendance change
-      await this.logAttendance(student, previousStatus, loggedBy);
+      const logResult = await this.logAttendance(student, previousStatus, loggedBy);
+      console.log(`📝 Attendance log result for ${student.name}: ${logResult ? 'SUCCESS' : 'FAILED'}`);
       
-      console.log(`Student ${student.name} updated successfully`);
+      console.log(`✅ Student ${student.name} updated successfully`);
       return true;
     } catch (error) {
-      console.error('Failed to update student in Firebase:', error);
+      console.error('❌ Failed to update student in Firebase:', error);
       return false;
     }
   }
@@ -128,7 +181,8 @@ class GoogleSheetsService {
 
   async logAttendance(student: Student, previousStatus?: string, loggedBy?: string): Promise<boolean> {
     if (!this.initialized || !this.database) {
-      console.warn('Firebase not initialized, attendance not logged');
+      console.warn('❌ Firebase not initialized, attendance not logged');
+      console.log('🔍 Log attendance - Firebase state:', { initialized: this.initialized, database: !!this.database });
       return false;
     }
 
@@ -138,6 +192,8 @@ class GoogleSheetsService {
       const timestamp = now.getTime();
       
       const logId = `${student.id}_${timestamp}`;
+      
+      console.log(`📝 Creating attendance log - ID: ${logId}, Student: ${student.name} (${student.id}), Status: ${student.status}, Date: ${dateStr}`);
       
       // Create attendance log with proper null/undefined handling
       const attendanceLog: AttendanceLog = {
@@ -190,10 +246,47 @@ class GoogleSheetsService {
       const attendanceRef = ref(this.database, `attendance_logs/${logId}`);
       await set(attendanceRef, attendanceLog);
       
-      console.log(`✅ Attendance logged for ${student.name}: ${student.status}`);
+      console.log(`✅ Attendance logged successfully - ${student.name}: ${student.status} (Log ID: ${logId})`);
+      console.log(`📊 Log data:`, attendanceLog);
+      console.log(`🔍 Log saved to path: attendance_logs/${logId}`);
+      console.log(`🗓️ Log date: ${attendanceLog.date}, Status: ${attendanceLog.status}`);
       return true;
     } catch (error) {
       console.error('❌ Failed to log attendance:', error);
+      return false;
+    }
+  }
+
+  async logDailyReset(studentCount: number): Promise<boolean> {
+    if (!this.initialized || !this.database) {
+      console.warn('Firebase not initialized, daily reset not logged');
+      return false;
+    }
+
+    try {
+      const now = new Date();
+      const dateStr = now.toISOString().split('T')[0]; // YYYY-MM-DD format
+      const timestamp = now.getTime();
+      
+      const logId = `daily_reset_${dateStr}`;
+      
+      const resetLog = {
+        id: logId,
+        date: dateStr,
+        timestamp: timestamp,
+        type: 'daily_reset',
+        students_affected: studentCount,
+        logged_by: 'system',
+        notes: `Daily reset: ${studentCount} students set to absent for new day`
+      };
+
+      const resetRef = ref(this.database, `system_logs/${logId}`);
+      await set(resetRef, resetLog);
+      
+      console.log(`✅ Daily reset logged: ${studentCount} students reset for ${dateStr}`);
+      return true;
+    } catch (error) {
+      console.error('❌ Failed to log daily reset:', error);
       return false;
     }
   }
@@ -205,30 +298,50 @@ class GoogleSheetsService {
     }
 
     try {
+      console.log(`🔍 Fetching attendance logs - startDate: ${startDate}, endDate: ${endDate}, section: ${section}`);
+      
       const logsRef = ref(this.database, 'attendance_logs');
       const snapshot = await get(logsRef);
       
       if (!snapshot.exists()) {
+        console.log('❌ No attendance logs found in Firebase');
         return [];
       }
 
       let logs = Object.values(snapshot.val()) as AttendanceLog[];
+      console.log(`📊 Total logs in Firebase: ${logs.length}`);
       
       // Filter by date range
       if (startDate) {
-        logs = logs.filter(log => log.date >= startDate);
+        const beforeFilter = logs.length;
+        logs = logs.filter(log => {
+          const logDate = log.date;
+          const matchesDate = logDate >= startDate;
+          return matchesDate;
+        });
+        console.log(`📅 After startDate filter (>= ${startDate}): ${logs.length} (was ${beforeFilter})`);
       }
       if (endDate) {
-        logs = logs.filter(log => log.date <= endDate);
+        const beforeFilter = logs.length;
+        logs = logs.filter(log => {
+          const logDate = log.date;
+          const matchesDate = logDate <= endDate;
+          return matchesDate;
+        });
+        console.log(`📅 After endDate filter (<= ${endDate}): ${logs.length} (was ${beforeFilter})`);
       }
       
       // Filter by section
       if (section && section !== 'All') {
+        const beforeFilter = logs.length;
         logs = logs.filter(log => log.section === section);
+        console.log(`🏫 After section filter (${section}): ${logs.length} (was ${beforeFilter})`);
       }
       
       // Sort by timestamp (newest first)
-      return logs.sort((a, b) => b.timestamp - a.timestamp);
+      const sortedLogs = logs.sort((a, b) => b.timestamp - a.timestamp);
+      console.log(`✅ Returning ${sortedLogs.length} filtered and sorted logs`);
+      return sortedLogs;
     } catch (error) {
       console.error('Failed to get attendance logs:', error);
       return [];
@@ -328,8 +441,8 @@ class GoogleSheetsService {
 
       // Convert students to CSV rows
       const rows = studentsWithRollNumbers.map(student => {
-        // Get attendance from logs for this date, default to 'present' if no log found
-        const loggedStatus = studentStatuses.get(student.id) || 'present';
+        // Get attendance from logs for this date, default to 'absent' if no log found (daily reset system)
+        const loggedStatus = studentStatuses.get(student.id) || 'absent';
         const attendance = loggedStatus === 'absent' ? 'A' : 'P';
         
         return [
@@ -397,7 +510,7 @@ class GoogleSheetsService {
       const rows = studentsWithRollNumbers.map(student => {
         const dateColumns = dateRange.map(date => {
           const statusMap = attendanceByDate.get(date);
-          const loggedStatus = statusMap?.get(student.id) || 'present';
+          const loggedStatus = statusMap?.get(student.id) || 'absent'; // Default to absent with daily reset system
           return loggedStatus === 'absent' ? 'A' : 'P';
         });
         
@@ -429,20 +542,30 @@ class GoogleSheetsService {
     bunking: number;
   }> {
     try {
+      // Get all students for the section
+      const students = await this.getStudents();
+      let studentsInSection = students;
+      if (section && section !== 'All') {
+        studentsInSection = students.filter(student => student.section === section);
+      }
+
+      // Get attendance logs for the target date
       const logs = await this.getAttendanceLogs(date, date, section);
       
       // Get the latest status for each student on this date
-      const studentStatuses = new Map<number, { status: string; timestamp: number }>();
+      const studentStatuses = new Map<number, string>();
       
-      logs.forEach(log => {
-        const existing = studentStatuses.get(log.student_id);
-        if (!existing || log.timestamp > existing.timestamp) {
-          studentStatuses.set(log.student_id, { status: log.status, timestamp: log.timestamp });
+      // Sort logs by timestamp (newest first) and process
+      const sortedLogs = logs.sort((a, b) => b.timestamp - a.timestamp);
+      sortedLogs.forEach(log => {
+        // Only set if we haven't seen this student yet (keeps the latest)
+        if (!studentStatuses.has(log.student_id)) {
+          studentStatuses.set(log.student_id, log.status);
         }
       });
 
       const statusCounts = {
-        total: studentStatuses.size,
+        total: studentsInSection.length,
         present: 0,
         absent: 0,
         washroom: 0,
@@ -450,7 +573,9 @@ class GoogleSheetsService {
         bunking: 0
       };
 
-      studentStatuses.forEach(({ status }) => {
+      // Count statuses for all students in section
+      studentsInSection.forEach(student => {
+        const status = studentStatuses.get(student.id) || 'absent'; // Default to absent with daily reset system
         statusCounts[status as keyof typeof statusCounts]++;
       });
 
@@ -567,7 +692,9 @@ class GoogleSheetsService {
           status: 'present',
           activity: '',
           timer_end: null,
-          notes: []
+          notes: [],
+          // Preserve lastResetDate during individual reset
+          lastResetDate: student.lastResetDate || this.getCurrentDateString()
         };
         
         await set(studentRef, resetStudent);
@@ -575,6 +702,39 @@ class GoogleSheetsService {
       }
     } catch (error) {
       console.error('Failed to reset student:', error);
+      throw error;
+    }
+  }
+
+  async performManualDailyReset(): Promise<void> {
+    if (!this.initialized || !this.database) {
+      console.warn('Firebase not initialized');
+      return;
+    }
+
+    try {
+      console.log('Performing manual daily reset for all students...');
+      
+      const dbRef = ref(this.database);
+      const snapshot = await get(child(dbRef, 'students'));
+      
+      if (snapshot.exists()) {
+        const data = snapshot.val();
+        const students = Object.values(data) as Student[];
+        
+        // Reset all students for new day regardless of their lastResetDate
+        const resetStudents = students.map(student => this.resetStudentForNewDay(student));
+        
+        // Save the reset students back to database
+        await this.saveAllStudents(resetStudents);
+        
+        // Log the manual reset
+        await this.logDailyReset(students.length);
+        
+        console.log(`Manual daily reset completed for ${students.length} students`);
+      }
+    } catch (error) {
+      console.error('Failed to perform manual daily reset:', error);
       throw error;
     }
   }

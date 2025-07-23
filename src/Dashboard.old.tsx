@@ -47,7 +47,8 @@ import {
 import Fuse from 'fuse.js';
 import { NotesDialog } from './components/NotesDialog';
 import { SimpleAttendanceDialog } from './components/SimpleAttendanceDialog';
-import { googleSheetsService, type Student } from './services/API';
+import { googleSheetsService } from './services/googleSheets';
+import type { Student } from './types';
 import { useAuth } from './hooks/useAuth';
 
 // Apple-inspired theme with rounded corners and soft shadows
@@ -1187,6 +1188,7 @@ export default function Stutra() {
           onClose={() => setAttendanceDialogOpen(false)}
           sections={sections}
           selectedSection={selectedSection}
+          students={students}
         />
       </Container>
     </ThemeProvider>

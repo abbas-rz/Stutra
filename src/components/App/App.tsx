@@ -319,6 +319,7 @@ export function App() {
           onClose={() => setAttendanceDialogOpen(false)}
           sections={sections}
           selectedSection={selectedSection}
+          students={students}
         />
       </Container>
     </ThemeProvider>
