@@ -24,6 +24,26 @@ export function createWashroomTimer(): number {
 }
 
 /**
+ * Format date and time to dd/mm/yyyy, HH:MM:SS format
+ */
+export function formatDateTimeDDMMYYYY(date: Date | string | number): string {
+  const dateObj = typeof date === 'string' || typeof date === 'number' ? new Date(date) : date;
+  
+  if (isNaN(dateObj.getTime())) {
+    return 'Invalid Date';
+  }
+  
+  const day = dateObj.getDate().toString().padStart(2, '0');
+  const month = (dateObj.getMonth() + 1).toString().padStart(2, '0');
+  const year = dateObj.getFullYear();
+  const hours = dateObj.getHours().toString().padStart(2, '0');
+  const minutes = dateObj.getMinutes().toString().padStart(2, '0');
+  const seconds = dateObj.getSeconds().toString().padStart(2, '0');
+  
+  return `${day}/${month}/${year}, ${hours}:${minutes}:${seconds}`;
+}
+
+/**
  * Check if student is considered present (any status except absent)
  */
 export function isStudentPresent(student: Student): boolean {

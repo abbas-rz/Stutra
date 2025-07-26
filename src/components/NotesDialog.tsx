@@ -14,6 +14,7 @@ import {
   IconButton,
 } from '@mui/material';
 import { Add, Delete } from '@mui/icons-material';
+import { formatDateDDMMYYYY } from '../utils';
 
 interface NotesDialogProps {
   open: boolean;
@@ -130,7 +131,7 @@ export function NotesDialog({
               >
                 <ListItemText
                   primary={note}
-                  secondary={`Added on ${new Date().toLocaleDateString()}`}
+                  secondary={`Added on ${formatDateDDMMYYYY(new Date())}`}
                 />
               </ListItem>
             ))}

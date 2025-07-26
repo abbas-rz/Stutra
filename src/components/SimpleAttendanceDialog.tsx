@@ -24,7 +24,7 @@ import {
   FileDownload,
 } from '@mui/icons-material';
 import { googleSheetsService } from '../services/googleSheets';
-import { formatDateDDMMYYYY, getCurrentDateString } from '../utils';
+import { formatDateDDMMYYYY, getCurrentDateString, formatDateTimeDDMMYYYY } from '../utils';
 import type { Student } from '../types';
 
 interface SimpleAttendanceDialogProps {
@@ -120,7 +120,7 @@ export function SimpleAttendanceDialog({
         student_id: log.student_id,
         status: log.status,
         date: log.date,
-        timestamp: new Date(log.timestamp).toLocaleString()
+        timestamp: formatDateTimeDDMMYYYY(log.timestamp)
       })));
       console.log('📝 Sample logs:', logs.slice(0, 3).map(log => `${log.student_name} (ID: ${log.student_id}): ${log.status}`));
       
@@ -391,6 +391,7 @@ export function SimpleAttendanceDialog({
                 InputProps={{
                   startAdornment: <CalendarToday sx={{ mr: 1, color: 'text.secondary' }} />,
                 }}
+                helperText="Date input format: Browser default, exported as dd/mm/yyyy"
               />
               <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
                 Date will be displayed as {formatDateDDMMYYYY(targetDate)} in export
@@ -406,6 +407,7 @@ export function SimpleAttendanceDialog({
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
                   InputLabelProps={{ shrink: true }}
+                  helperText="Input format: Browser default"
                 />
                 <TextField
                   fullWidth
@@ -415,6 +417,7 @@ export function SimpleAttendanceDialog({
                   onChange={(e) => setEndDate(e.target.value)}
                   InputLabelProps={{ shrink: true }}
                   inputProps={{ min: startDate }}
+                  helperText="Input format: Browser default"
                 />
               </Box>
               <Typography variant="caption" color="text.secondary">
