@@ -1,6 +1,6 @@
 # 📚 Stutra - Student Tracker
 
-A modern, Apple-inspired student tracking application built for schools and classrooms. Track student attendance, activities, and add notes with a beautiful, easy-to-use interface.
+A modern student tracking application built for schools and classrooms. Track student attendance, activities, and add notes with a beautiful, easy-to-use interface.
 
 > 🎉 **Recently Updated!** This codebase has been completely refactored with comprehensive documentation, full test coverage, and production-ready deployment guides. See [REFACTORING_COMPLETE.md](./REFACTORING_COMPLETE.md) for details.
 
