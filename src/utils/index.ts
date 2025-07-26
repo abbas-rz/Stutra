@@ -73,6 +73,38 @@ export function getCurrentDateString(): string {
 }
 
 /**
+ * Format date to dd/mm/yyyy format
+ */
+export function formatDateDDMMYYYY(date: Date | string | number): string {
+  const dateObj = typeof date === 'string' || typeof date === 'number' ? new Date(date) : date;
+  
+  if (isNaN(dateObj.getTime())) {
+    return 'Invalid Date';
+  }
+  
+  const day = dateObj.getDate().toString().padStart(2, '0');
+  const month = (dateObj.getMonth() + 1).toString().padStart(2, '0');
+  const year = dateObj.getFullYear();
+  
+  return `${day}/${month}/${year}`;
+}
+
+/**
+ * Convert YYYY-MM-DD to dd/mm/yyyy format
+ */
+export function convertDateFormat(dateString: string): string {
+  const date = new Date(dateString);
+  return formatDateDDMMYYYY(date);
+}
+
+/**
+ * Get current date in dd/mm/yyyy format
+ */
+export function getCurrentDateDDMMYYYY(): string {
+  return formatDateDDMMYYYY(new Date());
+}
+
+/**
  * Get latest note from student notes array
  */
 export function getLatestNote(notes: string[] | undefined): string | null {

@@ -24,6 +24,7 @@ import {
   FileDownload,
 } from '@mui/icons-material';
 import { googleSheetsService } from '../services/googleSheets';
+import { formatDateDDMMYYYY, getCurrentDateString } from '../utils';
 import type { Student } from '../types';
 
 interface SimpleAttendanceDialogProps {
@@ -42,9 +43,9 @@ export function SimpleAttendanceDialog({
   students
 }: SimpleAttendanceDialogProps) {
   const [exportType, setExportType] = useState<'single' | 'multiple'>('single');
-  const [targetDate, setTargetDate] = useState(new Date().toISOString().split('T')[0]);
-  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
-  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+  const [targetDate, setTargetDate] = useState(getCurrentDateString());
+  const [startDate, setStartDate] = useState(getCurrentDateString());
+  const [endDate, setEndDate] = useState(getCurrentDateString());
   const [sectionFilter, setSectionFilter] = useState(selectedSection);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -379,36 +380,46 @@ export function SimpleAttendanceDialog({
 
           {/* Date Selection */}
           {exportType === 'single' ? (
-            <TextField
-              fullWidth
-              type="date"
-              label="Target Date"
-              value={targetDate}
-              onChange={(e) => setTargetDate(e.target.value)}
-              InputLabelProps={{ shrink: true }}
-              InputProps={{
-                startAdornment: <CalendarToday sx={{ mr: 1, color: 'text.secondary' }} />,
-              }}
-            />
+            <Box>
+              <TextField
+                fullWidth
+                type="date"
+                label="Target Date"
+                value={targetDate}
+                onChange={(e) => setTargetDate(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+                InputProps={{
+                  startAdornment: <CalendarToday sx={{ mr: 1, color: 'text.secondary' }} />,
+                }}
+              />
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                Date will be displayed as {formatDateDDMMYYYY(targetDate)} in export
+              </Typography>
+            </Box>
           ) : (
-            <Box display="flex" gap={2}>
-              <TextField
-                fullWidth
-                type="date"
-                label="Start Date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                InputLabelProps={{ shrink: true }}
-              />
-              <TextField
-                fullWidth
-                type="date"
-                label="End Date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                InputLabelProps={{ shrink: true }}
-                inputProps={{ min: startDate }}
-              />
+            <Box display="flex" gap={2} flexDirection="column">
+              <Box display="flex" gap={2}>
+                <TextField
+                  fullWidth
+                  type="date"
+                  label="Start Date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                />
+                <TextField
+                  fullWidth
+                  type="date"
+                  label="End Date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                  inputProps={{ min: startDate }}
+                />
+              </Box>
+              <Typography variant="caption" color="text.secondary">
+                Dates will be displayed as {formatDateDDMMYYYY(startDate)} to {formatDateDDMMYYYY(endDate)} in export
+              </Typography>
             </Box>
           )}
 
@@ -430,8 +441,8 @@ export function SimpleAttendanceDialog({
                 fontFamily: 'monospace'
               }}>
 {exportType === 'single' 
-  ? `Student Name,Roll Number,Admission Number,${targetDate}\n"Alice Johnson","1","2024001","P"\n"Bob Smith","2","2024002","A"\n"Charlie Davis","3","2024003","P"`
-  : `Student Name,Roll Number,Admission Number,${startDate},${startDate !== endDate ? '...' : ''},${endDate}\n"Alice Johnson","1","2024001","P","P","P"\n"Bob Smith","2","2024002","A","P","A"\n"Charlie Davis","3","2024003","P","P","P"`
+  ? `Student Name,Roll Number,Admission Number,${formatDateDDMMYYYY(targetDate)}\n"Alice Johnson","1","2024001","P"\n"Bob Smith","2","2024002","A"\n"Charlie Davis","3","2024003","P"`
+  : `Student Name,Roll Number,Admission Number,${formatDateDDMMYYYY(startDate)},${startDate !== endDate ? '...' : ''},${formatDateDDMMYYYY(endDate)}\n"Alice Johnson","1","2024001","P","P","P"\n"Bob Smith","2","2024002","A","P","A"\n"Charlie Davis","3","2024003","P","P","P"`
 }
               </Box>
               <Typography variant="caption" color="text.secondary">

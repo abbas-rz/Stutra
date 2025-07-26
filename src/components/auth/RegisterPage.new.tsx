@@ -169,25 +169,6 @@ export default function RegisterPage() {
                   '&.Mui-focused fieldset': {
                     borderColor: 'primary.main',
                   },
-                  '& input': {
-                    '&:-webkit-autofill': {
-                      WebkitBoxShadow: '0 0 0 1000px rgba(255, 255, 255, 0.05) inset !important',
-                      WebkitTextFillColor: '#ffffff !important',
-                      borderRadius: '8px',
-                    },
-                    '&:-webkit-autofill:hover': {
-                      WebkitBoxShadow: '0 0 0 1000px rgba(255, 255, 255, 0.05) inset !important',
-                      WebkitTextFillColor: '#ffffff !important',
-                    },
-                    '&:-webkit-autofill:focus': {
-                      WebkitBoxShadow: '0 0 0 1000px rgba(255, 255, 255, 0.05) inset !important',
-                      WebkitTextFillColor: '#ffffff !important',
-                    },
-                    '&:-webkit-autofill:active': {
-                      WebkitBoxShadow: '0 0 0 1000px rgba(255, 255, 255, 0.05) inset !important',
-                      WebkitTextFillColor: '#ffffff !important',
-                    },
-                  },
                 },
               }}
             />
@@ -220,25 +201,6 @@ export default function RegisterPage() {
                   },
                   '&.Mui-focused fieldset': {
                     borderColor: 'primary.main',
-                  },
-                  '& input': {
-                    '&:-webkit-autofill': {
-                      WebkitBoxShadow: '0 0 0 1000px rgba(255, 255, 255, 0.05) inset !important',
-                      WebkitTextFillColor: '#ffffff !important',
-                      borderRadius: '8px',
-                    },
-                    '&:-webkit-autofill:hover': {
-                      WebkitBoxShadow: '0 0 0 1000px rgba(255, 255, 255, 0.05) inset !important',
-                      WebkitTextFillColor: '#ffffff !important',
-                    },
-                    '&:-webkit-autofill:focus': {
-                      WebkitBoxShadow: '0 0 0 1000px rgba(255, 255, 255, 0.05) inset !important',
-                      WebkitTextFillColor: '#ffffff !important',
-                    },
-                    '&:-webkit-autofill:active': {
-                      WebkitBoxShadow: '0 0 0 1000px rgba(255, 255, 255, 0.05) inset !important',
-                      WebkitTextFillColor: '#ffffff !important',
-                    },
                   },
                 },
               }}
@@ -284,25 +246,6 @@ export default function RegisterPage() {
                   },
                   '&.Mui-focused fieldset': {
                     borderColor: 'primary.main',
-                  },
-                  '& input': {
-                    '&:-webkit-autofill': {
-                      WebkitBoxShadow: '0 0 0 1000px rgba(255, 255, 255, 0.05) inset !important',
-                      WebkitTextFillColor: '#ffffff !important',
-                      borderRadius: '8px',
-                    },
-                    '&:-webkit-autofill:hover': {
-                      WebkitBoxShadow: '0 0 0 1000px rgba(255, 255, 255, 0.05) inset !important',
-                      WebkitTextFillColor: '#ffffff !important',
-                    },
-                    '&:-webkit-autofill:focus': {
-                      WebkitBoxShadow: '0 0 0 1000px rgba(255, 255, 255, 0.05) inset !important',
-                      WebkitTextFillColor: '#ffffff !important',
-                    },
-                    '&:-webkit-autofill:active': {
-                      WebkitBoxShadow: '0 0 0 1000px rgba(255, 255, 255, 0.05) inset !important',
-                      WebkitTextFillColor: '#ffffff !important',
-                    },
                   },
                 },
               }}

@@ -30,7 +30,7 @@ export function useStudentFilters(students: Student[]): UseStudentFiltersResult 
           return;
         }
       } catch {
-        console.log('Could not load sections from service, extracting from students');
+        // Could not load sections from service, extracting from students
       }
 
       // Fallback: extract from students
@@ -65,10 +65,11 @@ export function useStudentFilters(students: Student[]): UseStudentFiltersResult 
       });
       
       const results = fuseForSearch.search(searchTerm);
-      return results.map(result => result.item);
+      return results.map(result => result.item).sort((a, b) => a.name.localeCompare(b.name));
     }
     
-    return studentsToFilter;
+    // Sort all students alphabetically by name
+    return studentsToFilter.sort((a, b) => a.name.localeCompare(b.name));
   }, [searchTerm, students, selectedSection]);
 
   return {

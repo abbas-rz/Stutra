@@ -1,5 +1,6 @@
 import { getDatabase, ref, set, get, child, type Database } from 'firebase/database';
 import { initializeApp, type FirebaseApp } from 'firebase/app';
+import { formatDateDDMMYYYY } from '../utils';
 
 export interface Student {
   id: number;
@@ -120,8 +121,6 @@ class GoogleSheetsService {
         const studentsNeedingReset = students.filter(student => this.needsDailyReset(student));
         
         if (studentsNeedingReset.length > 0) {
-          console.log(`Performing daily reset for ${studentsNeedingReset.length} students`);
-          
           // Reset students for new day
           students = students.map(student => {
             if (this.needsDailyReset(student)) {
@@ -139,7 +138,6 @@ class GoogleSheetsService {
         
         return students;
       } else {
-        console.log('No students data found, initializing with XI Raman students');
         const students = this.getXIRamanStudents().map(student => this.resetStudentForNewDay(student));
         await this.saveAllStudents(students);
         return students;
@@ -356,7 +354,7 @@ class GoogleSheetsService {
         throw new Error('No attendance data found for the specified criteria');
       }
 
-      // CSV headers
+      // CSV headers - Customize these columns as needed
       const headers = [
         'Date',
         'Time',
@@ -436,8 +434,8 @@ class GoogleSheetsService {
         }
       });
 
-      // Create CSV headers - use section-based roll number
-      const headers = ['Student Name', 'Roll Number', date];
+      // Create CSV headers - customize column order here
+      const headers = ['Roll Number', 'Student Name', formatDateDDMMYYYY(date)];
 
       // Convert students to CSV rows
       const rows = studentsWithRollNumbers.map(student => {
@@ -446,8 +444,8 @@ class GoogleSheetsService {
         const attendance = loggedStatus === 'absent' ? 'A' : 'P';
         
         return [
-          student.name,
           student.sectionRollNumber.toString(),
+          student.name,
           attendance
         ];
       });
@@ -484,8 +482,8 @@ class GoogleSheetsService {
         sectionRollNumber: index + 1
       }));
 
-      // Create CSV headers - student info + date columns
-      const headers = ['Student Name', 'Roll Number', ...dateRange];
+      // Create CSV headers - student info + date columns  
+      const headers = ['Roll Number','Student Name',  ...dateRange.map(date => formatDateDDMMYYYY(date))];
 
       // Get attendance data for each date
       const attendanceByDate = new Map<string, Map<number, string>>();
@@ -515,8 +513,8 @@ class GoogleSheetsService {
         });
         
         return [
-          student.name,
           student.sectionRollNumber.toString(),
+          student.name,
           ...dateColumns
         ];
       });

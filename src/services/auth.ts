@@ -2,7 +2,10 @@ import { getDatabase, ref, set, get, child, push } from 'firebase/database';
 import { initializeApp } from 'firebase/app';
 import type { Teacher, LoginCredentials, CreateTeacherData } from '../types/auth';
 
-// Use the same Firebase config as googleSheets service
+/**
+ * Firebase configuration for authentication service
+ * Uses environment variables with fallback demo values for development
+ */
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "demo-key",
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "demo-project.firebaseapp.com",
@@ -13,28 +16,101 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:123456789:web:abcdef123456"
 };
 
+/**
+ * Authentication service for managing teacher accounts and sessions.
+ * 
+ * This service handles:
+ * - Teacher account creation and management
+ * - Login/logout functionality with session persistence
+ * - Password hashing and verification
+ * - Permission-based access control
+ * - Integration with Firebase Realtime Database
+ * 
+ * @class AuthService
+ * @example
+ * ```typescript
+ * // Login a teacher
+ * const teacher = await authService.login({
+ *   email: 'teacher@school.com',
+ *   password: 'password123'
+ * });
+ * 
+ * // Check authentication status
+ * if (authService.isAuthenticated()) {
+ *   const currentTeacher = authService.getCurrentTeacher();
+ * }
+ * ```
+ */
 class AuthService {
+  /** Firebase app instance for authentication */
   private app;
+  
+  /** Firebase Realtime Database instance */
   private database;
+  
+  /** Currently logged-in teacher (cached for performance) */
   private currentTeacher: Teacher | null = null;
 
+  /**
+   * Initialize the authentication service with Firebase configuration
+   */
   constructor() {
     this.app = initializeApp(firebaseConfig, 'auth-app');
     this.database = getDatabase(this.app);
   }
 
-  // Simple password hashing (in production, use bcrypt or similar)
+  /**
+   * Hash password using a simple base64 encoding with salt
+   * 
+   * @private
+   * @param password - Plain text password to hash
+   * @returns Hashed password string
+   * 
+   * @note In production, use a proper hashing library like bcrypt
+   */
   private hashPassword(password: string): string {
     // This is a very basic hash - use proper hashing in production
     return btoa(password + 'salt_key_stutra');
   }
 
+  /**
+   * Verify a plain text password against a hashed password
+   * 
+   * @private
+   * @param password - Plain text password to verify
+   * @param hashedPassword - Hashed password to compare against
+   * @returns True if passwords match
+   */
   private verifyPassword(password: string, hashedPassword: string): boolean {
     return this.hashPassword(password) === hashedPassword;
   }
 
+  /**
+   * Create a new teacher account in the system
+   * 
+   * @param data - Teacher creation data including email, name, password, and sections
+   * @returns Promise resolving to the created teacher (without password)
+   * @throws Error if teacher with email already exists
+   * @throws Error if required fields are missing
+   * 
+   * @example
+   * ```typescript
+   * const newTeacher = await authService.createTeacher({
+   *   email: 'teacher@school.com',
+   *   name: 'John Doe',
+   *   password: 'securePassword',
+   *   sections: ['XI-A', 'XI-B'],
+   *   isAdmin: false
+   * });
+   * ```
+   */
   async createTeacher(data: CreateTeacherData): Promise<Teacher> {
     try {
+      // Validate required fields
+      if (!data.email || !data.name || !data.password) {
+        throw new Error('Email, name, and password are required');
+      }
+
       // Check if teacher with email already exists
       const existingTeacher = await this.getTeacherByEmail(data.email);
       if (existingTeacher) {
@@ -44,10 +120,10 @@ class AuthService {
       const teacherId = push(child(ref(this.database), 'teachers')).key!;
       const teacher: Teacher = {
         id: teacherId,
-        email: data.email.toLowerCase(),
-        name: data.name,
+        email: data.email.toLowerCase().trim(),
+        name: data.name.trim(),
         password: this.hashPassword(data.password),
-        sections: data.sections,
+        sections: data.sections || [],
         isAdmin: data.isAdmin || false,
         createdAt: Date.now(),
       };

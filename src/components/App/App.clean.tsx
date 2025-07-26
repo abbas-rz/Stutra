@@ -35,7 +35,7 @@ import { NotesDialog } from '../NotesDialog';
 import { SimpleAttendanceDialog } from '../SimpleAttendanceDialog';
 import { useStudents, useStudentFilters } from '../../hooks';
 import { authService } from '../../services';
-import { APP_CONFIG, BREAKPOINTS } from '../../constants/index';
+import { APP_CONFIG, DEFAULTS, BREAKPOINTS } from '../../constants/index';
 import type { Student } from '../../types';
 
 /**
@@ -65,7 +65,9 @@ import type { Student } from '../../types';
  */
 export default function App() {
   // UI State Management
-  const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
+  const [selectedSection, setSelectedSection] = useState<string>(DEFAULTS.SECTION);
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [activityDialogOpen, setActivityDialogOpen] = useState<boolean>(false);
   const [notesDialogOpen, setNotesDialogOpen] = useState<boolean>(false);
   const [simpleAttendanceOpen, setSimpleAttendanceOpen] = useState<boolean>(false);
@@ -75,24 +77,8 @@ export default function App() {
   const isMobile = useMediaQuery(appleTheme.breakpoints.down(BREAKPOINTS.MOBILE));
 
   // Data Management Hooks
-  const { 
-    students, 
-    loading, 
-    error, 
-    refreshStudents, 
-    updateStudentStatus, 
-    resetStudent, 
-    addStudentNote, 
-    deleteStudentNote 
-  } = useStudents();
-  const { 
-    searchTerm, 
-    selectedSection, 
-    filteredStudents, 
-    sections, 
-    setSearchTerm, 
-    setSelectedSection 
-  } = useStudentFilters(students);
+  const { students, loading, error, refreshStudents, updateStudentStatus } = useStudents();
+  const { filteredStudents, sections } = useStudentFilters(students, selectedSection, searchTerm);
 
   // Authentication
   const currentTeacher = authService.getCurrentTeacher();
@@ -108,75 +94,30 @@ export default function App() {
 
   const handleSignOut = useCallback(async () => {
     try {
-      await authService.logout();
+      await authService.signOut();
       handleUserMenuClose();
     } catch (error) {
       console.error('Error signing out:', error);
     }
   }, [handleUserMenuClose]);
 
-  const handleActivitySelect = useCallback((studentId: number) => {
-    setSelectedStudentId(studentId);
+  const handleStudentClick = useCallback((student: Student) => {
+    setSelectedStudentId(student.id);
     setActivityDialogOpen(true);
   }, []);
 
-  const handleNotesOpen = useCallback((studentId: number) => {
-    setSelectedStudentId(studentId);
+  const handleNotesClick = useCallback((student: Student) => {
+    setSelectedStudentId(student.id);
     setNotesDialogOpen(true);
   }, []);
 
-  const handleStatusChange = useCallback(async (
-    studentId: number, 
-    status: Student['status'], 
-    activity: string, 
-    timerEnd: number | null
-  ) => {
+  const handleStatusChange = useCallback(async (studentId: string, newStatus: Student['status']) => {
     try {
-      await updateStudentStatus(studentId, status, activity, timerEnd);
+      await updateStudentStatus(studentId, newStatus);
     } catch (error) {
       console.error('Error updating student status:', error);
     }
   }, [updateStudentStatus]);
-
-  const handleResetStudent = useCallback(async (studentId: number) => {
-    try {
-      await resetStudent(studentId);
-    } catch (error) {
-      console.error('Error resetting student:', error);
-    }
-  }, [resetStudent]);
-
-  const handleAddNote = useCallback(async (note: string) => {
-    if (selectedStudentId) {
-      try {
-        await addStudentNote(selectedStudentId, note);
-      } catch (error) {
-        console.error('Error adding note:', error);
-      }
-    }
-  }, [selectedStudentId, addStudentNote]);
-
-  const handleDeleteNote = useCallback(async (index: number) => {
-    if (selectedStudentId) {
-      try {
-        await deleteStudentNote(selectedStudentId, index);
-      } catch (error) {
-        console.error('Error deleting note:', error);
-      }
-    }
-  }, [selectedStudentId, deleteStudentNote]);
-
-  const handleActivityDialogSelect = useCallback(async (activity: string) => {
-    if (selectedStudentId) {
-      try {
-        await updateStudentStatus(selectedStudentId, 'activity', activity, null);
-        setActivityDialogOpen(false);
-        setSelectedStudentId(null);
-      } catch (error) {
-        console.error('Error updating activity:', error);
-      }
-    }
-  }, [selectedStudentId, updateStudentStatus]);
 
   // Memoized Values
   const selectedStudent = useMemo(() => 
@@ -402,10 +343,8 @@ export default function App() {
                 key={student.id}
                 student={student}
                 onStatusChange={handleStatusChange}
-                onActivitySelect={handleActivitySelect}
-                onNotesOpen={handleNotesOpen}
-                onResetStudent={handleResetStudent}
-                isMobile={isMobile}
+                onActivityClick={() => handleStudentClick(student)}
+                onNotesClick={() => handleNotesClick(student)}
               />
             ))}
           </Box>
@@ -442,7 +381,12 @@ export default function App() {
             setActivityDialogOpen(false);
             setSelectedStudentId(null);
           }}
-          onSelect={handleActivityDialogSelect}
+          onSubmit={(activity) => {
+            if (selectedStudent) {
+              handleStatusChange(selectedStudent.id, 'activity');
+            }
+          }}
+          student={selectedStudent}
         />
 
         <NotesDialog
@@ -451,18 +395,13 @@ export default function App() {
             setNotesDialogOpen(false);
             setSelectedStudentId(null);
           }}
-          studentName={selectedStudent?.name || ''}
-          notes={selectedStudent?.notes || []}
-          onAddNote={handleAddNote}
-          onDeleteNote={handleDeleteNote}
+          student={selectedStudent}
         />
 
         <SimpleAttendanceDialog
           open={simpleAttendanceOpen}
           onClose={() => setSimpleAttendanceOpen(false)}
           students={students}
-          sections={sections}
-          selectedSection={selectedSection}
         />
       </Container>
     </ThemeProvider>

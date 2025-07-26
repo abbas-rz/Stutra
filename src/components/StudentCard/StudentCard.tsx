@@ -197,21 +197,28 @@ export function StudentCard({
               <Switch
                 checked={isPresent}
                 onChange={(e) => handlePresentToggle(e.target.checked)}
-                size="small"
+                size="medium"
                 sx={{
-                  transform: isMobile ? 'scale(0.7)' : 'scale(0.8)',
-                  mb: isMobile ? 0.2 : 0.3,
+                  transform: isMobile ? 'scale(1.0)' : 'scale(0.9)',
+                  mb: isMobile ? 0.5 : 0.3,
+                  '& .MuiSwitch-thumb': {
+                    width: isMobile ? 24 : 20,
+                    height: isMobile ? 24 : 20,
+                  },
+                  '& .MuiSwitch-track': {
+                    borderRadius: isMobile ? 12 : 10,
+                  },
                 }}
               />
               <Typography 
                 variant="caption" 
                 color={isPresent ? 'success.main' : 'error.main'}
                 sx={{ 
-                  fontSize: isMobile ? '0.55rem' : '0.65rem', 
+                  fontSize: isMobile ? '0.7rem' : '0.65rem', 
                   fontWeight: 600, 
                   lineHeight: 1,
                   textAlign: 'center',
-                  minWidth: isMobile ? '30px' : '35px',
+                  minWidth: isMobile ? '40px' : '35px',
                 }}
               >
                 {isPresent ? 'Present' : 'Absent'}

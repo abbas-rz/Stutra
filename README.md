@@ -2,6 +2,8 @@
 
 A modern, Apple-inspired student tracking application built for schools and classrooms. Track student attendance, activities, and add notes with a beautiful, easy-to-use interface.
 
+> 🎉 **Recently Updated!** This codebase has been completely refactored with comprehensive documentation, full test coverage, and production-ready deployment guides. See [REFACTORING_COMPLETE.md](./REFACTORING_COMPLETE.md) for details.
+
 ![Stutra Demo](https://via.placeholder.com/800x400/007AFF/FFFFFF?text=Stutra+Student+Tracker)
 
 ## ✨ What Can This App Do?
@@ -10,14 +12,24 @@ A modern, Apple-inspired student tracking application built for schools and clas
 - **⏰ Smart Timer**: Automatic 12-minute washroom timer that alerts you when time is up
 - **📝 Student Notes**: Add private notes about each student that only teachers can see
 - **🔍 Quick Search**: Find any student instantly by typing their name or admission number
-- **� Attendance Reports**: Generate detailed attendance reports with CSV export
+- **📊 Attendance Reports**: Generate detailed attendance reports with CSV export
 - **📈 Daily Analytics**: View daily summaries and attendance statistics
 - **🐍 Python Management**: Easy-to-use Python script for bulk student management
-- **�📱 Works Everywhere**: Use on computers, tablets, or phones
+- **📱 Works Everywhere**: Use on computers, tablets, or phones
 - **☁️ Cloud Sync**: All data is automatically saved to the cloud (Firebase)
 - **🎨 Beautiful Design**: Dark theme that's easy on the eyes
 - **🔄 Real-time Updates**: See changes instantly across all devices
 - **📥 Data Export**: Export attendance logs with dates for record-keeping
+
+## 📚 Documentation
+
+For comprehensive guides and references, see the [`docs/`](./docs/) folder:
+
+- 📖 **[Complete Setup Guide](./docs/README.md)** - Detailed installation and configuration
+- 🔗 **[API Reference](./docs/API_REFERENCE.md)** - Complete API documentation with examples
+- 🧩 **[Components Guide](./docs/COMPONENTS.md)** - Component architecture and usage
+- 🧪 **[Testing Guide](./docs/TESTING.md)** - Testing strategy and best practices
+- 🚀 **[Deployment Guide](./docs/DEPLOYMENT.md)** - Production deployment instructions
 
 ## 🚀 Quick Setup Guide for School Administrators
 

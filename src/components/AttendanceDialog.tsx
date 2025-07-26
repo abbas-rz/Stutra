@@ -29,6 +29,7 @@ import {
   Cancel,
 } from '@mui/icons-material';
 import { googleSheetsService } from '../services/googleSheets';
+import { formatDateDDMMYYYY, getCurrentDateString } from '../utils';
 
 interface AttendanceDialogProps {
   open: boolean;
@@ -47,8 +48,8 @@ interface DailySummary {
 }
 
 export function AttendanceDialog({ open, onClose, sections, selectedSection }: AttendanceDialogProps) {
-  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
-  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+  const [startDate, setStartDate] = useState(getCurrentDateString());
+  const [endDate, setEndDate] = useState(getCurrentDateString());
   const [section, setSection] = useState(selectedSection);
   const [summary, setSummary] = useState<DailySummary | null>(null);
   const [loading, setLoading] = useState(false);
@@ -59,9 +60,9 @@ export function AttendanceDialog({ open, onClose, sections, selectedSection }: A
     setError('');
     
     try {
-      const csvContent = await googleSheetsService.exportAttendanceToCSV(
+      // Use simple attendance export for P/A format, or detailed export for full logs
+      const csvContent = await googleSheetsService.exportSimpleAttendanceCSV(
         startDate,
-        endDate,
         section === 'All' ? undefined : section
       );
       
@@ -71,7 +72,7 @@ export function AttendanceDialog({ open, onClose, sections, selectedSection }: A
       const url = URL.createObjectURL(blob);
       
       link.setAttribute('href', url);
-      link.setAttribute('download', `attendance_${section}_${startDate}_to_${endDate}.csv`);
+      link.setAttribute('download', `attendance_${section}_${startDate}_simple.csv`);
       link.style.visibility = 'hidden';
       
       document.body.appendChild(link);
@@ -264,7 +265,7 @@ export function AttendanceDialog({ open, onClose, sections, selectedSection }: A
             Export Options
           </Typography>
           <Typography variant="body2" color="text.secondary" paragraph>
-            Export detailed attendance logs including timestamps, status changes, and activity durations.
+            Export simple P/A attendance format for the selected date.
           </Typography>
           
           <Button
@@ -284,7 +285,7 @@ export function AttendanceDialog({ open, onClose, sections, selectedSection }: A
               fontWeight: 600,
             }}
           >
-            {loading ? 'Exporting...' : 'Export to CSV'}
+            {loading ? 'Exporting...' : 'Export Attendance (P/A)'}
           </Button>
         </Box>
 
@@ -300,9 +301,8 @@ export function AttendanceDialog({ open, onClose, sections, selectedSection }: A
           }}
         >
           <Typography variant="body2">
-            <strong>CSV Export includes:</strong> Date, Time, Student Name, Admission Number, Section, 
-            Status, Activity, Duration, Notes, and who logged the change. Perfect for record-keeping 
-            and analysis.
+            <strong>CSV Export includes:</strong> Student name, roll number, and P/A status for the selected date.
+            Perfect for traditional attendance records.
           </Typography>
         </Alert>
       </DialogContent>
