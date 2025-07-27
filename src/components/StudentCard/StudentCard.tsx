@@ -117,7 +117,7 @@ export function StudentCard({
     >
       <CardContent sx={{ flexGrow: 1, p: 3 }}>
         {/* Header with Avatar, Student Info, and Controls */}
-        <Box display="flex" alignItems="center" mb={1}>
+        <Box display="flex" alignItems="center" mb={1} sx={{ minHeight: isMobile ? '48px' : '56px' }}>
           <Avatar 
             sx={{ 
               width: isMobile ? 36 : 48, 
@@ -132,26 +132,74 @@ export function StudentCard({
             <Person fontSize={isMobile ? 'small' : 'medium'} />
           </Avatar>
           
-          <Box flexGrow={1} mr={1}>
+          <Box flexGrow={1} minWidth={0} mr={2}>
             <Typography 
               variant={isMobile ? 'body2' : 'subtitle2'} 
               fontWeight="bold" 
               noWrap 
-              sx={{ mb: 0.2, lineHeight: 1.2 }}
+              sx={{ 
+                mb: 0.2, 
+                lineHeight: 1.2,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                maxWidth: '100%'
+              }}
             >
               {student.name}
             </Typography>
             <Typography 
               variant="caption"
               color="text.secondary" 
-              sx={{ fontSize: isMobile ? '0.65rem' : '0.75rem', lineHeight: 1 }}
+              sx={{ fontSize: isMobile ? '0.65rem' : '0.75rem', lineHeight: 1, display: 'block' }}
             >
               #{student.admission_number}
             </Typography>
+            {/* Display multiple sections */}
+            <Box sx={{ mt: 0.5, display: 'flex', flexWrap: 'wrap', maxWidth: '100%' }}>
+              {student.sections && student.sections.length > 0 ? (
+                student.sections.map((section) => (
+                  <Chip
+                    key={section}
+                    label={section}
+                    size="small"
+                    variant="outlined"
+                    sx={{
+                      fontSize: '0.6rem',
+                      height: 16,
+                      mr: 0.5,
+                      mb: 0.2,
+                      borderColor: 'rgba(255, 255, 255, 0.3)',
+                      color: 'text.secondary',
+                      '& .MuiChip-label': { px: 0.5 }
+                    }}
+                  />
+                ))
+              ) : student.section ? (
+                // Backward compatibility for single section
+                <Chip
+                  label={student.section}
+                  size="small"
+                  variant="outlined"
+                  sx={{
+                    fontSize: '0.6rem',
+                    height: 16,
+                    borderColor: 'rgba(255, 255, 255, 0.3)',
+                    color: 'text.secondary',
+                    '& .MuiChip-label': { px: 0.5 }
+                  }}
+                />
+              ) : null}
+            </Box>
           </Box>
 
           {/* Right side controls */}
-          <Box display="flex" alignItems="center" gap={isMobile ? 0.5 : 1}>
+          <Box 
+            display="flex" 
+            alignItems="center" 
+            gap={isMobile ? 0.5 : 1}
+            flexShrink={0}
+            minWidth={isMobile ? '120px' : '140px'}
+          >
             <IconButton
               size="small"
               onClick={() => onNotesOpen(student.id)}
@@ -193,7 +241,14 @@ export function StudentCard({
             </IconButton>
 
             {/* Present/Absent toggle */}
-            <Box display="flex" flexDirection="column" alignItems="center" ml={0.5}>
+            <Box 
+              display="flex" 
+              flexDirection="column" 
+              alignItems="center" 
+              ml={0.5}
+              flexShrink={0}
+              minWidth={isMobile ? '50px' : '45px'}
+            >
               <Switch
                 checked={isPresent}
                 onChange={(e) => handlePresentToggle(e.target.checked)}

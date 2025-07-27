@@ -3,7 +3,8 @@ export interface Teacher {
   email: string;
   name: string;
   password: string; // In production, this should be hashed
-  sections: string[]; // Array of section names the teacher can access
+  sections?: string[]; // Legacy field for backward compatibility
+  assignedSections: string[]; // New field to match database structure
   isAdmin: boolean;
   createdAt: number;
   lastLogin?: number;
@@ -24,6 +25,7 @@ export interface CreateTeacherData {
   email: string;
   name: string;
   password: string;
-  sections: string[];
+  sections?: string[]; // Legacy field for backward compatibility
+  assignedSections: string[]; // New field to match database structure
   isAdmin?: boolean;
 }

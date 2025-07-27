@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import Fuse from 'fuse.js';
 import type { Student } from '../types';
 import { DEFAULTS } from '../constants/index';
-import { googleSheetsService } from '../services/googleSheets';
+import { firebaseService } from '../services/firebase';
 
 export interface UseStudentFiltersResult {
   searchTerm: string;
@@ -24,7 +24,7 @@ export function useStudentFilters(students: Student[]): UseStudentFiltersResult 
     const loadSections = async () => {
       try {
         // Try to load from service first
-        const serviceSections = await googleSheetsService.getSections();
+        const serviceSections = await firebaseService.getSections();
         if (serviceSections.length > 0) {
           setSections([DEFAULTS.SECTION, ...serviceSections]);
           return;
@@ -33,9 +33,18 @@ export function useStudentFilters(students: Student[]): UseStudentFiltersResult 
         // Could not load sections from service, extracting from students
       }
 
-      // Fallback: extract from students
+      // Fallback: extract from students (using multi-section support)
       if (students.length > 0) {
-        const uniqueSections = Array.from(new Set(students.map(student => student.section)));
+        const allSectionsSet = new Set<string>();
+        students.forEach(student => {
+          // Handle both old single-section and new multi-section formats
+          if (student.sections && Array.isArray(student.sections)) {
+            student.sections.forEach(section => allSectionsSet.add(section));
+          } else if (student.section) {
+            allSectionsSet.add(student.section);
+          }
+        });
+        const uniqueSections = Array.from(allSectionsSet);
         const sectionsWithAll = [DEFAULTS.SECTION, ...uniqueSections.sort()];
         setSections(sectionsWithAll);
       }
@@ -48,15 +57,31 @@ export function useStudentFilters(students: Student[]): UseStudentFiltersResult 
   const filteredStudents = useMemo(() => {
     let studentsToFilter = students;
     
-    // Filter by section first
+    // Filter by section first (support multi-section students)
     if (selectedSection && selectedSection !== DEFAULTS.SECTION) {
-      studentsToFilter = students.filter(student => student.section === selectedSection);
+      studentsToFilter = students.filter(student => {
+        // Check if student belongs to the selected section
+        if (student.sections && Array.isArray(student.sections)) {
+          return student.sections.includes(selectedSection);
+        } else if (student.section) {
+          // Backward compatibility
+          return student.section === selectedSection;
+        }
+        return false;
+      });
     }
     
     // Then apply search filter
     if (searchTerm) {
       const filteredForSearch = selectedSection && selectedSection !== DEFAULTS.SECTION
-        ? students.filter(student => student.section === selectedSection)
+        ? students.filter(student => {
+            if (student.sections && Array.isArray(student.sections)) {
+              return student.sections.includes(selectedSection);
+            } else if (student.section) {
+              return student.section === selectedSection;
+            }
+            return false;
+          })
         : students;
       
       const fuseForSearch = new Fuse(filteredForSearch, {

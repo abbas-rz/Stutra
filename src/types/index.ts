@@ -3,7 +3,8 @@ export interface Student {
   name: string;
   admission_number: string;
   photo_url: string;
-  section: string;
+  section?: string; // Legacy field for backward compatibility
+  sections: string[]; // New multi-section support
   status: 'present' | 'absent' | 'washroom' | 'activity' | 'bunking';
   activity: string;
   timer_end: number | null;

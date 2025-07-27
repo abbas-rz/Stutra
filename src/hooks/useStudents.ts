@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { Student } from '../types';
-import { googleSheetsService } from '../services/googleSheets';
+import { firebaseService } from '../services/firebase';
 import { APP_CONFIG } from '../constants/index';
 
 export interface UseStudentsResult {
@@ -28,8 +28,8 @@ export function useStudents(): UseStudentsResult {
   const refreshStudents = useCallback(async () => {
     try {
       setError(null);
-      await googleSheetsService.initialize();
-      const studentsData = await googleSheetsService.getStudents();
+      await firebaseService.initialize();
+      const studentsData = await firebaseService.getStudents();
       setStudents(studentsData);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load students';
@@ -62,7 +62,7 @@ export function useStudents(): UseStudentsResult {
       const currentStudent = students.find(s => s.id === studentId);
       if (currentStudent) {
         const studentToUpdate = { ...currentStudent, status, activity, timer_end: timerEnd };
-        await googleSheetsService.updateStudentWithLog(studentToUpdate, previousStatus);
+        await firebaseService.updateStudentWithLog(studentToUpdate, previousStatus);
       }
     } catch (err) {
       console.error('Failed to update student in database:', err);
@@ -90,7 +90,7 @@ export function useStudents(): UseStudentsResult {
           timer_end: null, 
           notes: [] 
         };
-        await googleSheetsService.updateStudent(resetStudentData);
+        await firebaseService.updateStudent(resetStudentData);
       }
     } catch (err) {
       console.error('Failed to reset student:', err);
@@ -110,7 +110,7 @@ export function useStudents(): UseStudentsResult {
       const updatedStudent = students.find(s => s.id === studentId);
       if (updatedStudent) {
         const studentToUpdate = { ...updatedStudent, notes: [...(updatedStudent.notes || []), note] };
-        await googleSheetsService.updateStudent(studentToUpdate);
+        await firebaseService.updateStudent(studentToUpdate);
       }
     } catch (err) {
       console.error('Failed to update student notes:', err);
@@ -136,7 +136,7 @@ export function useStudents(): UseStudentsResult {
           ...updatedStudent, 
           notes: updatedStudent.notes?.filter((_, index) => index !== noteIndex) || []
         };
-        await googleSheetsService.updateStudent(studentToUpdate);
+        await firebaseService.updateStudent(studentToUpdate);
       }
     } catch (err) {
       console.error('Failed to update student notes:', err);
@@ -146,7 +146,7 @@ export function useStudents(): UseStudentsResult {
 
   const markAllPresent = useCallback(async (section?: string) => {
     const studentsToUpdate = section && section !== 'All' 
-      ? students.filter(student => student.section === section)
+      ? students.filter(student => student.sections.includes(section))
       : students;
       
     // Update local state immediately
@@ -161,7 +161,7 @@ export function useStudents(): UseStudentsResult {
     try {
       const promises = studentsToUpdate.map(student => {
         const updatedStudent = { ...student, status: 'present' as const, activity: '', timer_end: null };
-        return googleSheetsService.updateStudent(updatedStudent);
+        return firebaseService.updateStudent(updatedStudent);
       });
       await Promise.all(promises);
     } catch (err) {
@@ -179,7 +179,7 @@ export function useStudents(): UseStudentsResult {
   useEffect(() => {
     const interval = setInterval(async () => {
       try {
-        const studentsData = await googleSheetsService.getStudents();
+        const studentsData = await firebaseService.getStudents();
         setStudents(studentsData);
       } catch (err) {
         console.error('Failed to refresh students data:', err);

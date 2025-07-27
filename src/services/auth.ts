@@ -123,7 +123,8 @@ class AuthService {
         email: data.email.toLowerCase().trim(),
         name: data.name.trim(),
         password: this.hashPassword(data.password),
-        sections: data.sections || [],
+        sections: data.sections || [], // Legacy field for backward compatibility
+        assignedSections: data.assignedSections || data.sections || [], // New field
         isAdmin: data.isAdmin || false,
         createdAt: Date.now(),
       };
@@ -162,7 +163,8 @@ class AuthService {
         id: teacher.id,
         email: teacher.email,
         name: teacher.name,
-        sections: teacher.sections,
+        sections: teacher.sections || [], // Legacy compatibility
+        assignedSections: teacher.assignedSections || teacher.sections || [], // New structure
         isAdmin: teacher.isAdmin,
       }));
 
@@ -300,7 +302,7 @@ class AuthService {
           email: 'admin@stutra.com',
           name: 'Admin',
           password: 'admin123',
-          sections: [], // Admin can access all sections
+          assignedSections: [], // Admin can access all sections
           isAdmin: true,
         });
         console.log('Default admin created: admin@stutra.com / admin123');
@@ -339,7 +341,7 @@ class AuthService {
         return ['XI-A', 'XI-B', 'XI-C', 'XI-D', 'XI-E', 'XI-F', 'XI-G', 'XI-H', 'XI-I', 'XI-J'];
       }
       
-      return teacher.sections;
+      return teacher.assignedSections || teacher.sections || [];
     } catch (error) {
       console.error('Error getting sections for teacher:', error);
       throw error;

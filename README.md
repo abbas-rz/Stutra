@@ -26,10 +26,15 @@ A modern student tracking application built for schools and classrooms. Track st
 For comprehensive guides and references, see the [`docs/`](./docs/) folder:
 
 - 📖 **[Complete Setup Guide](./docs/README.md)** - Detailed installation and configuration
-- 🔗 **[API Reference](./docs/API_REFERENCE.md)** - Complete API documentation with examples
+- � **[Beginner's Guide](./docs/beginner-guide/README.md)** - Learn how the code works (perfect for noobs!)
+- �🔗 **[API Reference](./docs/API_REFERENCE.md)** - Complete API documentation with examples
 - 🧩 **[Components Guide](./docs/COMPONENTS.md)** - Component architecture and usage
 - 🧪 **[Testing Guide](./docs/TESTING.md)** - Testing strategy and best practices
 - 🚀 **[Deployment Guide](./docs/DEPLOYMENT.md)** - Production deployment instructions
+
+### 🎓 New to the Codebase?
+
+If you're new to React, TypeScript, or want to understand how Stutra works, start with our [**Beginner's Guide**](./docs/beginner-guide/README.md)! It explains every file and function in simple terms, perfect for learning.
 
 ## 🚀 Quick Setup Guide for School Administrators
 

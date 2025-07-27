@@ -22,11 +22,11 @@ import {
 } from '@mui/material';
 import {
   Search,
-  Refresh,
   Analytics,
   AccountCircle,
   Logout,
   Person,
+  CheckCircle,
 } from '@mui/icons-material';
 import appleTheme from '../../theme';
 import { StudentCard } from '../StudentCard/index';
@@ -79,11 +79,11 @@ export default function App() {
     students, 
     loading, 
     error, 
-    refreshStudents, 
     updateStudentStatus, 
     resetStudent, 
     addStudentNote, 
-    deleteStudentNote 
+    deleteStudentNote,
+    markAllPresent
   } = useStudents();
   const { 
     searchTerm, 
@@ -354,8 +354,8 @@ export default function App() {
             <Box display="flex" gap={1}>
               <Button
                 variant="outlined"
-                onClick={refreshStudents}
-                startIcon={<Refresh />}
+                onClick={() => markAllPresent(selectedSection === 'All' ? undefined : selectedSection)}
+                startIcon={<CheckCircle />}
                 sx={{
                   borderColor: 'rgba(255, 255, 255, 0.2)',
                   color: 'text.primary',
@@ -366,7 +366,7 @@ export default function App() {
                   },
                 }}
               >
-                {isMobile ? '' : 'Refresh'}
+                {isMobile ? '' : `Mark All Present${selectedSection !== 'All' ? ` (${selectedSection})` : ''}`}
               </Button>
               
               <Button
@@ -399,7 +399,7 @@ export default function App() {
           >
             {filteredStudents.map((student) => (
               <StudentCard
-                key={student.id}
+                key={`${student.id}-${student.admission_number}`}
                 student={student}
                 onStatusChange={handleStatusChange}
                 onActivitySelect={handleActivitySelect}
