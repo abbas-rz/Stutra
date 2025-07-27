@@ -28,7 +28,7 @@ import {
   CheckCircle,
   Cancel,
 } from '@mui/icons-material';
-import { googleSheetsService } from '../services/googleSheets';
+import { firebaseService } from '../services/firebase';
 import { formatDateDDMMYYYY, getCurrentDateString } from '../utils';
 
 interface AttendanceDialogProps {
@@ -61,7 +61,7 @@ export function AttendanceDialog({ open, onClose, sections, selectedSection }: A
     
     try {
       // Use simple attendance export for P/A format, or detailed export for full logs
-      const csvContent = await googleSheetsService.exportSimpleAttendanceCSV(
+      const csvContent = await firebaseService.exportSimpleAttendanceCSV(
         startDate,
         section === 'All' ? undefined : section
       );
@@ -93,7 +93,7 @@ export function AttendanceDialog({ open, onClose, sections, selectedSection }: A
     setError('');
     
     try {
-      const summaryData = await googleSheetsService.getDailySummary(
+      const summaryData = await firebaseService.getDailySummary(
         startDate,
         section === 'All' ? undefined : section
       );

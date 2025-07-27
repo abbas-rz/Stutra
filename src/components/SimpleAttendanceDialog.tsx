@@ -23,7 +23,7 @@ import {
   TableChart,
   FileDownload,
 } from '@mui/icons-material';
-import { googleSheetsService } from '../services/googleSheets';
+import { firebaseService } from '../services/firebase';
 import { formatDateDDMMYYYY, getCurrentDateString } from '../utils';
 import type { Student } from '../types';
 
@@ -127,7 +127,7 @@ export function SimpleAttendanceDialog({
       console.log(`� Starting CSV export for ${targetDate} (Section: ${section || 'All'})`);
       
       // Initialize service
-      await googleSheetsService.initialize();
+      await firebaseService.initialize();
       
       // Filter and prepare students
       const studentsToExport = filterStudentsBySection(students, section);
@@ -136,7 +136,7 @@ export function SimpleAttendanceDialog({
       console.log(`📋 Exporting ${studentsWithRollNumbers.length} students`);
       
       // Get attendance logs for the date
-      const logs = await googleSheetsService.getAttendanceLogs(targetDate, targetDate);
+      const logs = await firebaseService.getAttendanceLogs(targetDate, targetDate);
       const studentStatuses = getLatestStudentStatuses(logs);
       
       console.log(`📝 Found ${logs.length} attendance logs for ${targetDate}`);
@@ -172,7 +172,7 @@ export function SimpleAttendanceDialog({
       console.log(`� Starting multi-date CSV export for ${dateRange.length} dates (Section: ${section || 'All'})`);
       
       // Initialize service
-      await googleSheetsService.initialize();
+      await firebaseService.initialize();
       
       // Filter and prepare students
       const studentsToExport = filterStudentsBySection(students, section);
@@ -187,7 +187,7 @@ export function SimpleAttendanceDialog({
       const attendanceByDate = new Map<string, Map<number, string>>();
       
       for (const date of dateRange) {
-        const logs = await googleSheetsService.getAttendanceLogs(date, date);
+        const logs = await firebaseService.getAttendanceLogs(date, date);
         const studentStatuses = getLatestStudentStatuses(logs);
         attendanceByDate.set(date, studentStatuses);
       }

@@ -483,6 +483,37 @@ class FirebaseService {
     
     return csvContent;
   }
+
+  // Force update student data with real data from the database
+  async forceUpdateStudentData(): Promise<void> {
+    if (!this.initialized || !this.database) return;
+
+    try {
+      console.log('Force updating database with real student data...');
+      const students = await this.getStudents(); // Fetch real students from the database
+      await this.saveAllStudents(students);
+      console.log('Real student data updated successfully in the database');
+    } catch (error) {
+      console.error('Failed to force update students:', error);
+    }
+  }
+
+  // Placeholder for saveAllStudents (migrated from googleSheets.old.ts)
+  private async saveAllStudents(students: Student[]): Promise<void> {
+    if (!this.database) return;
+
+    const updates: Record<string, Student> = {};
+    students.forEach(student => {
+      updates[`students/${student.id}`] = student;
+    });
+
+    try {
+      const dbRef = ref(this.database);
+      await set(dbRef, updates);
+    } catch (error) {
+      console.error('Failed to save students:', error);
+    }
+  }
 }
 
 export const firebaseService = new FirebaseService();
