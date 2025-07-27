@@ -24,7 +24,7 @@ import {
   FileDownload,
 } from '@mui/icons-material';
 import { googleSheetsService } from '../services/googleSheets';
-import { formatDateDDMMYYYY, getCurrentDateString, formatDateTimeDDMMYYYY } from '../utils';
+import { formatDateDDMMYYYY, getCurrentDateString } from '../utils';
 import type { Student } from '../types';
 
 interface SimpleAttendanceDialogProps {
@@ -34,6 +34,46 @@ interface SimpleAttendanceDialogProps {
   selectedSection: string;
   students: Student[]; // Add actual students data
 }
+
+interface StudentWithRollNumber extends Student {
+  sectionRollNumber: number;
+}
+
+// Helper functions for cleaner code organization
+const filterStudentsBySection = (students: Student[], section?: string): Student[] => {
+  if (!section || section === 'All') return students;
+  
+  return students.filter(student => 
+    student.sections?.includes(section) || 
+    student.section === section // Legacy compatibility
+  );
+};
+
+const assignRollNumbers = (students: Student[]): StudentWithRollNumber[] => {
+  const sortedStudents = [...students].sort((a, b) => a.name.localeCompare(b.name));
+  return sortedStudents.map((student, index) => ({
+    ...student,
+    sectionRollNumber: index + 1
+  }));
+};
+
+const getLatestStudentStatuses = (logs: any[]): Map<number, string> => {
+  const statusMap = new Map<number, string>();
+  const sortedLogs = logs.sort((a, b) => b.timestamp - a.timestamp);
+  
+  sortedLogs.forEach(log => {
+    if (!statusMap.has(log.student_id)) {
+      statusMap.set(log.student_id, log.status);
+    }
+  });
+  
+  return statusMap;
+};
+
+const getAttendanceStatus = (studentId: number, statusMap: Map<number, string>): string => {
+  const loggedStatus = statusMap.get(studentId);
+  return loggedStatus && loggedStatus !== 'absent' ? 'P' : 'A';
+};
 
 export function SimpleAttendanceDialog({ 
   open, 
@@ -76,202 +116,102 @@ export function SimpleAttendanceDialog({
     return dates;
   };
 
-  // Local CSV export methods using the actual students data
+  /**
+   * Export attendance data for a single date as CSV
+   * @param targetDate - Date to export in YYYY-MM-DD format
+   * @param section - Optional section filter
+   * @returns CSV content string
+   */
   const exportSingleDateCSV = async (targetDate: string, section?: string): Promise<string> => {
     try {
-      console.log('🔍 CSV Export Debug - Starting export for date:', targetDate);
-      console.log('🔍 Current date for comparison:', new Date().toISOString().split('T')[0]);
-      console.log('🔍 Target date type:', typeof targetDate, 'Current date type:', typeof new Date().toISOString().split('T')[0]);
-      console.log('🔍 Are dates equal?', targetDate === new Date().toISOString().split('T')[0]);
+      console.log(`� Starting CSV export for ${targetDate} (Section: ${section || 'All'})`);
       
-      // Initialize GoogleSheets service before using it
-      console.log('🔧 Initializing GoogleSheets service...');
+      // Initialize service
       await googleSheetsService.initialize();
-      console.log('✅ GoogleSheets service initialized');
       
-      // Check Firebase connection and data first
-      console.log('🔥 Checking Firebase connection and existing logs...');
-      const allLogsRaw = await googleSheetsService.getAttendanceLogs();
-      console.log('🔥 Firebase connection check - Total logs in database:', allLogsRaw.length);
+      // Filter and prepare students
+      const studentsToExport = filterStudentsBySection(students, section);
+      const studentsWithRollNumbers = assignRollNumbers(studentsToExport);
       
-      if (allLogsRaw.length === 0) {
-        console.log('⚠️  WARNING: No attendance logs found in Firebase database');
-      } else {
-        console.log('✅ Found attendance logs in Firebase');
-        console.log('🔥 Sample log statuses:', allLogsRaw.slice(0, 5).map(log => `${log.student_name}: ${log.status}`));
-      }
+      console.log(`📋 Exporting ${studentsWithRollNumbers.length} students`);
       
-      // Filter by section if specified
-      let studentsToExport = students;
-      if (section && section !== 'All') {
-        studentsToExport = students.filter(student => 
-          student.sections?.includes(section) || 
-          student.section === section // Keep legacy support
-        );
-        console.log(`📊 Section filter "${section}" applied. Students found:`, studentsToExport.length);
-        console.log('📋 Filtered students:', studentsToExport.map(s => ({ name: s.name, sections: s.sections, section: s.section })));
-      }
-
-      console.log('📊 Students to export:', studentsToExport.length);
-      console.log('📋 First few students:', studentsToExport.slice(0, 3).map(s => `${s.name} (ID: ${s.id})`));
-
-      // Sort students alphabetically by name
-      studentsToExport.sort((a, b) => a.name.localeCompare(b.name));
-
-      // Generate section-based roll numbers (starting from 1)
-      const studentsWithRollNumbers = studentsToExport.map((student, index) => ({
-        ...student,
-        sectionRollNumber: index + 1
-      }));
-
-      // Get attendance logs for the target date - don't filter by section here since we already filtered students
-      console.log('🔍 About to call getAttendanceLogs with:', { startDate: targetDate, endDate: targetDate, section: 'no section filter' });
+      // Get attendance logs for the date
       const logs = await googleSheetsService.getAttendanceLogs(targetDate, targetDate);
-      console.log('📝 Total attendance logs found for date:', logs.length);
-      console.log('📝 All logs for debugging:', logs.map(log => ({
-        student_name: log.student_name,
-        student_id: log.student_id,
-        status: log.status,
-        date: log.date,
-        section: log.section,
-        timestamp: formatDateTimeDDMMYYYY(log.timestamp)
-      })));
-      console.log('📝 Sample logs:', logs.slice(0, 3).map(log => `${log.student_name} (ID: ${log.student_id}): ${log.status} on ${log.date}`));
+      const studentStatuses = getLatestStudentStatuses(logs);
       
-      // Get the latest status for each student on this date
-      const studentStatuses = new Map<number, string>();
+      console.log(`📝 Found ${logs.length} attendance logs for ${targetDate}`);
       
-      // Sort logs by timestamp (newest first) and process
-      const sortedLogs = logs.sort((a, b) => b.timestamp - a.timestamp);
-      sortedLogs.forEach(log => {
-        // Only set if we haven't seen this student yet (keeps the latest)
-        if (!studentStatuses.has(log.student_id)) {
-          studentStatuses.set(log.student_id, log.status);
-          console.log(`✅ Latest status for ${log.student_name} (ID: ${log.student_id}): ${log.status}`);
-        }
+      // Generate CSV content
+      const headers = ['Student Name', 'Roll Number', formatDateDDMMYYYY(targetDate)];
+      const rows = studentsWithRollNumbers.map((student: StudentWithRollNumber) => {
+        const attendance = getAttendanceStatus(student.id, studentStatuses);
+        return [student.name, student.sectionRollNumber.toString(), attendance];
       });
-
-      console.log('🎯 Final student statuses map size:', studentStatuses.size);
-      console.log('🎯 Student statuses:', Array.from(studentStatuses.entries()).slice(0, 5));
-
-      // Create CSV headers
-      const headers = ['Student Name', 'Roll Number', targetDate];
-
-      // Convert students to CSV rows
-      const rows = studentsWithRollNumbers.map(student => {
-        // Check if there's a log entry for this student on this date
-        const loggedStatus = studentStatuses.get(student.id);
-        
-        let attendance: string;
-        if (loggedStatus) {
-          // If there's a log entry, use it to determine P/A
-          attendance = loggedStatus === 'absent' ? 'A' : 'P';
-          console.log(`✅ ${student.name} (ID: ${student.id}): Has log with status '${loggedStatus}' -> ${attendance}`);
-        } else {
-          // If no log entry, default to 'A' (absent) as per daily reset system
-          attendance = 'A';
-          console.log(`❌ ${student.name} (ID: ${student.id}): No log found -> ${attendance}`);
-        }
-        
-        return [
-          student.name,
-          student.sectionRollNumber.toString(),
-          attendance
-        ];
-      });
-
-      // Combine headers and rows
+      
       const csvContent = [headers, ...rows]
-        .map(row => row.map(field => `"${field}"`).join(','))
+        .map((row: string[]) => row.map((field: string) => `"${field}"`).join(','))
         .join('\n');
-
-      console.log('📄 CSV Export completed successfully');
+      
+      console.log('✅ CSV export completed successfully');
       return csvContent;
+      
     } catch (error) {
-      console.error('❌ Failed to export single date attendance to CSV:', error);
+      console.error('❌ CSV export failed:', error);
       throw error;
     }
   };
 
+  /**
+   * Export attendance data for multiple dates as CSV
+   * @param dateRange - Array of dates in YYYY-MM-DD format
+   * @param section - Optional section filter
+   * @returns CSV content string
+   */
   const exportMultiDateCSV = async (dateRange: string[], section?: string): Promise<string> => {
     try {
-      // Initialize GoogleSheets service before using it
-      console.log('🔧 Initializing GoogleSheets service for multi-date export...');
-      await googleSheetsService.initialize();
-      console.log('✅ GoogleSheets service initialized for multi-date export');
+      console.log(`� Starting multi-date CSV export for ${dateRange.length} dates (Section: ${section || 'All'})`);
       
-      // Filter by section if specified
-      let studentsToExport = students;
-      if (section && section !== 'All') {
-        studentsToExport = students.filter(student => 
-          student.sections?.includes(section) || 
-          student.section === section // Keep legacy support
-        );
-        console.log(`📊 Multi-date section filter "${section}" applied. Students found:`, studentsToExport.length);
-        console.log('📋 Multi-date filtered students:', studentsToExport.map(s => ({ name: s.name, sections: s.sections, section: s.section })));
-      }
-
-      // Sort students alphabetically by name
-      studentsToExport.sort((a, b) => a.name.localeCompare(b.name));
-
-      // Generate section-based roll numbers (starting from 1)
-      const studentsWithRollNumbers = studentsToExport.map((student, index) => ({
-        ...student,
-        sectionRollNumber: index + 1
-      }));
-
-      // Create CSV headers - student info + date columns
-      const headers = ['Student Name', 'Roll Number', ...dateRange];
-
+      // Initialize service
+      await googleSheetsService.initialize();
+      
+      // Filter and prepare students
+      const studentsToExport = filterStudentsBySection(students, section);
+      const studentsWithRollNumbers = assignRollNumbers(studentsToExport);
+      
+      console.log(`📋 Exporting ${studentsWithRollNumbers.length} students for date range`);
+      
+      // Create CSV headers
+      const headers = ['Student Name', 'Roll Number', ...dateRange.map(formatDateDDMMYYYY)];
+      
       // Get attendance data for each date
       const attendanceByDate = new Map<string, Map<number, string>>();
       
       for (const date of dateRange) {
-        // Don't filter by section in getAttendanceLogs since we already filtered students
         const logs = await googleSheetsService.getAttendanceLogs(date, date);
-        const studentStatuses = new Map<number, string>();
-        
-        // Sort logs by timestamp (newest first) and get latest status per student
-        const sortedLogs = logs.sort((a, b) => b.timestamp - a.timestamp);
-        sortedLogs.forEach(log => {
-          // Only set if we haven't seen this student yet (keeps the latest)
-          if (!studentStatuses.has(log.student_id)) {
-            studentStatuses.set(log.student_id, log.status);
-          }
-        });
-        
+        const studentStatuses = getLatestStudentStatuses(logs);
         attendanceByDate.set(date, studentStatuses);
       }
-
+      
       // Create rows with attendance for each date
-      const rows = studentsWithRollNumbers.map(student => {
+      const rows = studentsWithRollNumbers.map((student: StudentWithRollNumber) => {
         const dateColumns = dateRange.map(date => {
           const statusMap = attendanceByDate.get(date);
-          const loggedStatus = statusMap?.get(student.id);
-          
-          // If there's a log entry, use it to determine P/A, otherwise default to A
-          if (loggedStatus) {
-            return loggedStatus === 'absent' ? 'A' : 'P';
-          } else {
-            return 'A'; // Default to absent if no log entry
-          }
+          return getAttendanceStatus(student.id, statusMap || new Map());
         });
         
-        return [
-          student.name,
-          student.sectionRollNumber.toString(),
-          ...dateColumns
-        ];
+        return [student.name, student.sectionRollNumber.toString(), ...dateColumns];
       });
-
-      // Combine headers and rows
+      
+      // Generate CSV content
       const csvContent = [headers, ...rows]
-        .map(row => row.map(field => `"${field}"`).join(','))
+        .map((row: string[]) => row.map((field: string) => `"${field}"`).join(','))
         .join('\n');
-
+      
+      console.log('✅ Multi-date CSV export completed successfully');
       return csvContent;
+      
     } catch (error) {
-      console.error('Failed to export multi-date attendance to CSV:', error);
+      console.error('❌ Multi-date CSV export failed:', error);
       throw error;
     }
   };
@@ -468,8 +408,8 @@ export function SimpleAttendanceDialog({
                 fontFamily: 'monospace'
               }}>
 {exportType === 'single' 
-  ? `Student Name,Roll Number,Admission Number,${formatDateDDMMYYYY(targetDate)}\n"Alice Johnson","1","2024001","P"\n"Bob Smith","2","2024002","A"\n"Charlie Davis","3","2024003","P"`
-  : `Student Name,Roll Number,Admission Number,${formatDateDDMMYYYY(startDate)},${startDate !== endDate ? '...' : ''},${formatDateDDMMYYYY(endDate)}\n"Alice Johnson","1","2024001","P","P","P"\n"Bob Smith","2","2024002","A","P","A"\n"Charlie Davis","3","2024003","P","P","P"`
+  ? `Student Name,Roll Number,${formatDateDDMMYYYY(targetDate)}\n"Alice Johnson","1","P"\n"Bob Smith","2","A"\n"Charlie Davis","3","P"`
+  : `Student Name,Roll Number,${formatDateDDMMYYYY(startDate)},${startDate !== endDate ? '...' : ''},${formatDateDDMMYYYY(endDate)}\n"Alice Johnson","1","P","P","P"\n"Bob Smith","2","A","P","A"\n"Charlie Davis","3","P","P","P"`
 }
               </Box>
               <Typography variant="caption" color="text.secondary">
@@ -477,7 +417,7 @@ export function SimpleAttendanceDialog({
                 • Roll numbers start from 1 within each section<br/>
                 • Default status is Absent (A)<br/>
                 • Present (P) only if marked present on that specific date<br/>
-                • Includes admission number for verification
+                • Date-based attendance tracking with audit trail
               </Typography>
             </CardContent>
           </Card>
@@ -506,12 +446,4 @@ export function SimpleAttendanceDialog({
       </DialogActions>
     </Dialog>
   );
-}
-
-
-interface SimpleAttendanceDialogProps {
-  open: boolean;
-  onClose: () => void;
-  sections: string[];
-  selectedSection: string;
 }
