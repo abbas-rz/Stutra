@@ -81,6 +81,13 @@ export function SimpleAttendanceDialog({
     try {
       console.log('🔍 CSV Export Debug - Starting export for date:', targetDate);
       console.log('🔍 Current date for comparison:', new Date().toISOString().split('T')[0]);
+      console.log('🔍 Target date type:', typeof targetDate, 'Current date type:', typeof new Date().toISOString().split('T')[0]);
+      console.log('🔍 Are dates equal?', targetDate === new Date().toISOString().split('T')[0]);
+      
+      // Initialize GoogleSheets service before using it
+      console.log('🔧 Initializing GoogleSheets service...');
+      await googleSheetsService.initialize();
+      console.log('✅ GoogleSheets service initialized');
       
       // Check Firebase connection and data first
       console.log('🔥 Checking Firebase connection and existing logs...');
@@ -97,7 +104,12 @@ export function SimpleAttendanceDialog({
       // Filter by section if specified
       let studentsToExport = students;
       if (section && section !== 'All') {
-        studentsToExport = students.filter(student => student.section === section);
+        studentsToExport = students.filter(student => 
+          student.sections?.includes(section) || 
+          student.section === section // Keep legacy support
+        );
+        console.log(`📊 Section filter "${section}" applied. Students found:`, studentsToExport.length);
+        console.log('📋 Filtered students:', studentsToExport.map(s => ({ name: s.name, sections: s.sections, section: s.section })));
       }
 
       console.log('📊 Students to export:', studentsToExport.length);
@@ -113,6 +125,7 @@ export function SimpleAttendanceDialog({
       }));
 
       // Get attendance logs for the target date - don't filter by section here since we already filtered students
+      console.log('🔍 About to call getAttendanceLogs with:', { startDate: targetDate, endDate: targetDate, section: 'no section filter' });
       const logs = await googleSheetsService.getAttendanceLogs(targetDate, targetDate);
       console.log('📝 Total attendance logs found for date:', logs.length);
       console.log('📝 All logs for debugging:', logs.map(log => ({
@@ -120,9 +133,10 @@ export function SimpleAttendanceDialog({
         student_id: log.student_id,
         status: log.status,
         date: log.date,
+        section: log.section,
         timestamp: formatDateTimeDDMMYYYY(log.timestamp)
       })));
-      console.log('📝 Sample logs:', logs.slice(0, 3).map(log => `${log.student_name} (ID: ${log.student_id}): ${log.status}`));
+      console.log('📝 Sample logs:', logs.slice(0, 3).map(log => `${log.student_name} (ID: ${log.student_id}): ${log.status} on ${log.date}`));
       
       // Get the latest status for each student on this date
       const studentStatuses = new Map<number, string>();
@@ -181,10 +195,20 @@ export function SimpleAttendanceDialog({
 
   const exportMultiDateCSV = async (dateRange: string[], section?: string): Promise<string> => {
     try {
+      // Initialize GoogleSheets service before using it
+      console.log('🔧 Initializing GoogleSheets service for multi-date export...');
+      await googleSheetsService.initialize();
+      console.log('✅ GoogleSheets service initialized for multi-date export');
+      
       // Filter by section if specified
       let studentsToExport = students;
       if (section && section !== 'All') {
-        studentsToExport = students.filter(student => student.section === section);
+        studentsToExport = students.filter(student => 
+          student.sections?.includes(section) || 
+          student.section === section // Keep legacy support
+        );
+        console.log(`📊 Multi-date section filter "${section}" applied. Students found:`, studentsToExport.length);
+        console.log('📋 Multi-date filtered students:', studentsToExport.map(s => ({ name: s.name, sections: s.sections, section: s.section })));
       }
 
       // Sort students alphabetically by name

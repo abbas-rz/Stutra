@@ -49,6 +49,8 @@ export function useStudents(): UseStudentsResult {
     // Get previous status for logging
     const currentStudent = students.find(s => s.id === studentId);
     const previousStatus = currentStudent?.status;
+    
+    console.log(`🎯 updateStudentStatus called - Student ID: ${studentId}, Status: ${previousStatus} → ${status}`);
 
     // Update local state immediately for instant feedback
     setStudents(prev => prev.map(student => 
@@ -62,7 +64,9 @@ export function useStudents(): UseStudentsResult {
       const currentStudent = students.find(s => s.id === studentId);
       if (currentStudent) {
         const studentToUpdate = { ...currentStudent, status, activity, timer_end: timerEnd };
+        console.log(`🔄 Calling firebaseService.updateStudentWithLog for ${currentStudent.name}`);
         await firebaseService.updateStudentWithLog(studentToUpdate, previousStatus);
+        console.log(`✅ updateStudentWithLog completed for ${currentStudent.name}`);
       }
     } catch (err) {
       console.error('Failed to update student in database:', err);
@@ -72,6 +76,12 @@ export function useStudents(): UseStudentsResult {
   }, [students, refreshStudents]);
 
   const resetStudent = useCallback(async (studentId: number) => {
+    // Get previous status for logging
+    const currentStudent = students.find(s => s.id === studentId);
+    const previousStatus = currentStudent?.status;
+    
+    console.log(`🎯 resetStudent called - Student ID: ${studentId}, Previous status: ${previousStatus}`);
+
     try {
       // Update local state immediately
       setStudents(prev => prev.map(student => 
@@ -80,7 +90,7 @@ export function useStudents(): UseStudentsResult {
           : student
       ));
       
-      // Use existing updateStudent method to reset the student
+      // Use existing updateStudent method to reset the student with logging
       const studentToReset = students.find(s => s.id === studentId);
       if (studentToReset) {
         const resetStudentData = { 
@@ -90,7 +100,10 @@ export function useStudents(): UseStudentsResult {
           timer_end: null, 
           notes: [] 
         };
-        await firebaseService.updateStudent(resetStudentData);
+        console.log(`🔄 Calling updateStudentWithLog for reset: ${studentToReset.name}`);
+        // Use updateStudentWithLog to ensure the reset is logged for attendance export
+        await firebaseService.updateStudentWithLog(resetStudentData, previousStatus);
+        console.log(`✅ Reset completed for ${studentToReset.name}`);
       }
     } catch (err) {
       console.error('Failed to reset student:', err);
@@ -145,25 +158,55 @@ export function useStudents(): UseStudentsResult {
   }, [students, refreshStudents]);
 
   const markAllPresent = useCallback(async (section?: string) => {
+    console.log(`🎯 markAllPresent called - Section: ${section || 'All'}`);
+    
     const studentsToUpdate = section && section !== 'All' 
-      ? students.filter(student => student.sections.includes(section))
+      ? students.filter(student => 
+          student.sections.includes(section) || 
+          student.section === section  // Legacy field compatibility
+        )
       : students;
       
+    console.log(`🎯 Students to mark present: ${studentsToUpdate.length}`);
+    console.log(`🎯 Students:`, studentsToUpdate.map(s => `${s.name} (${s.status})`));
+    
+    // Capture previous statuses BEFORE updating local state
+    const studentUpdates = studentsToUpdate.map(student => ({
+      student,
+      previousStatus: student.status,
+      updatedStudent: { 
+        ...student, 
+        status: 'present' as const, 
+        activity: '', 
+        timer_end: null 
+      }
+    }));
+      
     // Update local state immediately
-    const updated = students.map(student => 
-      studentsToUpdate.some(s => s.id === student.id)
-        ? { ...student, status: 'present' as const, activity: '', timer_end: null }
-        : student
-    );
+    const updated = students.map(student => {
+      const updateInfo = studentUpdates.find(u => u.student.id === student.id);
+      return updateInfo ? updateInfo.updatedStudent : student;
+    });
     
     setStudents(updated);
     
     try {
-      const promises = studentsToUpdate.map(student => {
-        const updatedStudent = { ...student, status: 'present' as const, activity: '', timer_end: null };
-        return firebaseService.updateStudent(updatedStudent);
+      // Use updateStudentWithLog for each student to ensure attendance logging
+      console.log(`🔄 Starting updateStudentWithLog for ${studentsToUpdate.length} students`);
+      const promises = studentUpdates.map(({ student, previousStatus, updatedStudent }) => {
+        console.log(`🔄 Marking ${student.name} present (was ${previousStatus})`);
+        
+        // For "Mark All Present", we want to force logging even if status hasn't changed
+        // This ensures teacher's explicit action is always recorded
+        console.log(`🔄 Force logging for Mark All Present: ${student.name}`);
+        return firebaseService.updateStudent(updatedStudent).then(async () => {
+          // Always log the "Mark All Present" action regardless of previous status
+          await firebaseService.logAttendanceChange(updatedStudent, previousStatus || 'unknown');
+          console.log(`✅ Forced attendance log for ${student.name} in Mark All Present`);
+        });
       });
       await Promise.all(promises);
+      console.log(`✅ Mark all present completed for ${studentsToUpdate.length} students`);
     } catch (err) {
       console.error('Failed to update students:', err);
       await refreshStudents();

@@ -278,11 +278,19 @@ class FirebaseService {
    * Update student with attendance logging
    */
   async updateStudentWithLog(student: Student, previousStatus?: string): Promise<void> {
+    console.log(`🔄 updateStudentWithLog called for ${student.name} (ID: ${student.id})`);
+    console.log(`🔄 Previous status: ${previousStatus}, New status: ${student.status}`);
+    
     await this.updateStudent(student);
+    console.log(`✅ Student updated in database`);
     
     // Log the change if status changed
     if (previousStatus && previousStatus !== student.status) {
+      console.log(`📝 Status changed detected - calling logAttendanceChange()`);
       await this.logAttendanceChange(student, previousStatus);
+    } else {
+      console.log(`⏭️ No status change detected - skipping attendance log`);
+      console.log(`⏭️ Previous: "${previousStatus}", Current: "${student.status}"`);
     }
   }
 
@@ -290,9 +298,15 @@ class FirebaseService {
    * Log attendance change for audit trail
    */
   async logAttendanceChange(student: Student, previousStatus: string): Promise<void> {
-    if (!this.initialized || !this.database) return;
+    if (!this.initialized || !this.database) {
+      console.warn('🚨 Firebase not initialized - cannot log attendance change');
+      return;
+    }
 
     try {
+      console.log(`📝 LOGGING ATTENDANCE CHANGE: ${student.name} (ID: ${student.id})`);
+      console.log(`📝 Status change: ${previousStatus} → ${student.status}`);
+      
       const teacher = authService.getCurrentTeacher();
       const logEntry: AttendanceLog = {
         id: `${student.id}_${Date.now()}`,
@@ -308,11 +322,112 @@ class FirebaseService {
         notes: `Status changed from ${previousStatus} to ${student.status}`
       };
 
+      console.log(`📝 Log entry created:`, {
+        id: logEntry.id,
+        student: logEntry.student_name,
+        date: logEntry.date,
+        status: logEntry.status,
+        section: logEntry.section
+      });
+
       const logsRef = ref(this.database, `attendance_logs/${logEntry.id}`);
       await set(logsRef, logEntry);
+      
+      console.log(`✅ Attendance log saved successfully for ${student.name}`);
     } catch (error) {
-      console.error('Error logging attendance change:', error);
+      console.error('❌ Error logging attendance change:', error);
       // Don't throw error for logging failures
+    }
+  }
+
+  /**
+   * Get attendance logs for specified date range and section
+   */
+  async getAttendanceLogs(startDate?: string, endDate?: string, section?: string): Promise<AttendanceLog[]> {
+    if (!this.initialized || !this.database) {
+      console.warn('Firebase not initialized');
+      return [];
+    }
+
+    try {
+      console.log(`🔍 Fetching attendance logs - startDate: ${startDate}, endDate: ${endDate}, section: ${section}`);
+      
+      const logsRef = ref(this.database, 'attendance_logs');
+      const snapshot = await get(logsRef);
+      
+      if (!snapshot.exists()) {
+        console.log('❌ No attendance logs found in Firebase');
+        return [];
+      }
+
+      let logs = Object.values(snapshot.val()) as AttendanceLog[];
+      console.log(`📊 Total logs in Firebase: ${logs.length}`);
+      
+      // Show sample raw logs for debugging
+      if (logs.length > 0) {
+        console.log(`📋 Raw log samples:`, logs.slice(0, 5).map(log => ({
+          student: log.student_name,
+          date: log.date,
+          status: log.status,
+          section: log.section,
+          timestamp: new Date(log.timestamp).toLocaleString()
+        })));
+        
+        // Show all unique dates in logs
+        const uniqueDates = [...new Set(logs.map(log => log.date))].sort();
+        console.log(`📅 All unique dates in logs:`, uniqueDates);
+        
+        // Show date being searched for
+        console.log(`🔍 Searching for startDate: '${startDate}', endDate: '${endDate}'`);
+      }
+      
+      // Filter by date range
+      if (startDate) {
+        const beforeFilter = logs.length;
+        logs = logs.filter(log => {
+          const logDate = log.date;
+          const matches = logDate >= startDate;
+          if (!matches && logs.length < 10) { // Only log mismatches for first few to avoid spam
+            console.log(`❌ Date mismatch: log date '${logDate}' vs startDate '${startDate}' (>=: ${matches})`);
+          }
+          return matches;
+        });
+        console.log(`📅 After startDate filter (>= ${startDate}): ${logs.length} (was ${beforeFilter})`);
+        if (logs.length > 0) {
+          console.log(`📅 Sample matching logs:`, logs.slice(0, 3).map(log => `${log.student_name}: ${log.date}`));
+        }
+      }
+      
+      if (endDate) {
+        const beforeFilter = logs.length;
+        logs = logs.filter(log => {
+          const logDate = log.date;
+          const matches = logDate <= endDate;
+          if (!matches && logs.length < 10) { // Only log mismatches for first few to avoid spam
+            console.log(`❌ Date mismatch: log date '${logDate}' vs endDate '${endDate}' (<=: ${matches})`);
+          }
+          return matches;
+        });
+        console.log(`📅 After endDate filter (<= ${endDate}): ${logs.length} (was ${beforeFilter})`);
+        if (logs.length > 0) {
+          console.log(`📅 Sample matching logs after endDate:`, logs.slice(0, 3).map(log => `${log.student_name}: ${log.date}`));
+        }
+      }
+      
+      // Filter by section
+      if (section && section !== 'All') {
+        const beforeFilter = logs.length;
+        logs = logs.filter(log => log.section === section);
+        console.log(`🏫 After section filter (${section}): ${logs.length} (was ${beforeFilter})`);
+      }
+      
+      // Sort by timestamp (newest first)
+      const sortedLogs = logs.sort((a, b) => b.timestamp - a.timestamp);
+      console.log(`✅ Returning ${sortedLogs.length} filtered and sorted logs`);
+      return sortedLogs;
+    } catch (error) {
+      console.error('Failed to get attendance logs:', error);
+      return [];
     }
   }
 
