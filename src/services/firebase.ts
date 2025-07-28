@@ -570,6 +570,34 @@ class FirebaseService {
   }
 
   /**
+   * Get all available sections from the database (for registration and admin purposes)
+   */
+  async getAllSections(): Promise<string[]> {
+    try {
+      if (!this.initialized || !this.database) return [];
+      
+      const dbRef = ref(this.database);
+      const snapshot = await get(child(dbRef, 'sections'));
+      
+      if (!snapshot.exists()) return [];
+      
+      const sectionsData = snapshot.val();
+      const sections: string[] = [];
+      
+      Object.entries(sectionsData).forEach(([, sectionData]) => {
+        if (sectionData && typeof sectionData === 'object' && 'name' in sectionData && typeof sectionData.name === 'string') {
+          sections.push(sectionData.name);
+        }
+      });
+      
+      return sections.sort();
+    } catch (error) {
+      console.error('Error fetching all sections:', error);
+      return [];
+    }
+  }
+
+  /**
    * Export attendance data for current teacher's accessible students
    */
   async exportAttendanceCSV(): Promise<string> {

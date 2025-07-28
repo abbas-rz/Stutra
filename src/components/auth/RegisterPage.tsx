@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   ThemeProvider,
@@ -25,6 +25,7 @@ import {
   AdminPanelSettings,
 } from '@mui/icons-material';
 import { authService } from '../../services/auth';
+import { firebaseService } from '../../services/firebase';
 import appleTheme from '../../theme';
 import { APP_CONFIG, BREAKPOINTS } from '../../constants/index';
 
@@ -34,21 +35,47 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [sections, setSections] = useState<string[]>([]);
+  const [availableSections, setAvailableSections] = useState<string[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loadingSections, setLoadingSections] = useState(true);
   const navigate = useNavigate();
   const isMobile = useMediaQuery(appleTheme.breakpoints.down(BREAKPOINTS.MOBILE));
 
-  const availableSections = ['XI Raman', 'XI Satyarthi', 'XI Curie', 'XI Hawking'];
+  // Load available sections from database
+  useEffect(() => {
+    const loadSections = async () => {
+      try {
+        setLoadingSections(true);
+        await firebaseService.initialize(); // Ensure Firebase is initialized
+        const sectionsFromDb = await firebaseService.getAllSections();
+        setAvailableSections(sectionsFromDb);
+      } catch (error) {
+        console.error('Failed to load sections:', error);
+        // Fallback to hardcoded sections if database fails
+        setAvailableSections(['XI Raman', 'XI Satyarthi', 'XI Curie', 'XI Hawking']);
+      } finally {
+        setLoadingSections(false);
+      }
+    };
+
+    loadSections();
+  }, []);
 
   const handleRegister = async () => {
     try {
       setError('');
       setSuccess('');
       setLoading(true);
-      await authService.createTeacher({ email, name, password, sections, isAdmin });
+      await authService.createTeacher({ 
+        email, 
+        name, 
+        password, 
+        assignedSections: sections, 
+        isAdmin 
+      });
       setSuccess('Account created successfully! You can now log in.');
     } catch {
       setError('Failed to create account. Please try again.');
@@ -313,24 +340,32 @@ export default function RegisterPage() {
               <Typography variant="subtitle1" sx={{ mb: 2, color: 'text.primary' }}>
                 Assign Sections:
               </Typography>
-              <Box display="flex" flexWrap="wrap" gap={1}>
-                {availableSections.map((section) => (
-                  <Chip
-                    key={section}
-                    label={section}
-                    onClick={() => handleSectionChange(section)}
-                    variant={sections.includes(section) ? 'filled' : 'outlined'}
-                    sx={{
-                      bgcolor: sections.includes(section) ? 'rgba(0, 122, 255, 0.2)' : 'transparent',
-                      color: sections.includes(section) ? 'primary.main' : 'text.secondary',
-                      borderColor: sections.includes(section) ? 'primary.main' : 'rgba(255, 255, 255, 0.2)',
-                      '&:hover': {
-                        bgcolor: sections.includes(section) ? 'rgba(0, 122, 255, 0.3)' : 'rgba(0, 122, 255, 0.1)',
-                      },
-                    }}
-                  />
-                ))}
-              </Box>
+              {loadingSections ? (
+                <Box display="flex" alignItems="center" gap={2}>
+                  <Typography variant="body2" color="text.secondary">
+                    Loading sections...
+                  </Typography>
+                </Box>
+              ) : (
+                <Box display="flex" flexWrap="wrap" gap={1}>
+                  {availableSections.map((section) => (
+                    <Chip
+                      key={section}
+                      label={section}
+                      onClick={() => handleSectionChange(section)}
+                      variant={sections.includes(section) ? 'filled' : 'outlined'}
+                      sx={{
+                        bgcolor: sections.includes(section) ? 'rgba(0, 122, 255, 0.2)' : 'transparent',
+                        color: sections.includes(section) ? 'primary.main' : 'text.secondary',
+                        borderColor: sections.includes(section) ? 'primary.main' : 'rgba(255, 255, 255, 0.2)',
+                        '&:hover': {
+                          bgcolor: sections.includes(section) ? 'rgba(0, 122, 255, 0.3)' : 'rgba(0, 122, 255, 0.1)',
+                        },
+                      }}
+                    />
+                  ))}
+                </Box>
+              )}
             </Box>
 
             {/* Admin Checkbox */}
