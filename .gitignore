@@ -23,3 +23,7 @@ dist-ssr
 *.sln
 *.sw?
 src/initializeDatabase.ts
+scripts/attendancelog/outputs/*
+scripts/attendancelog/*.csv
+
+scripts/attendancelog/*.json
