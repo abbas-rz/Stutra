@@ -162,6 +162,64 @@ export function SimpleAttendanceDialog({
   };
 
   /**
+   * Export log CSV with section summary and absentees
+   * @param targetDate - Date to export in YYYY-MM-DD format
+   * @param section - Optional section filter
+   * @returns CSV content string
+   */
+  const exportLogCSV = async (targetDate: string, section?: string): Promise<string> => {
+    try {
+      console.log(`📊 Starting LOG CSV export for ${targetDate} (Section: ${section || 'All'})`);
+      
+      // Initialize service
+      await firebaseService.initialize();
+      
+      // Get attendance logs for the date
+      const logs = await firebaseService.getAttendanceLogs(targetDate, targetDate);
+      const studentStatuses = getLatestStudentStatuses(logs);
+      
+      console.log(`📝 Found ${logs.length} attendance logs for ${targetDate}`);
+      
+      // Process sections
+      const sectionsToProcess = section === 'All' ? sections.filter(s => s !== 'All') : [section!];
+      
+      const headers = ['Section', 'Total Strength', 'Present', 'Absent', 'Names of Absentees'];
+      const rows: string[] = [];
+      
+      for (const sectionName of sectionsToProcess) {
+        const sectionStudents = filterStudentsBySection(students, sectionName);
+        const totalStrength = sectionStudents.length;
+        
+        let presentCount = 0;
+        let absentCount = 0;
+        const absenteeNames: string[] = [];
+        
+        sectionStudents.forEach(student => {
+          const attendance = getAttendanceStatus(student.id, studentStatuses);
+          if (attendance === 'P') {
+            presentCount++;
+          } else {
+            absentCount++;
+            absenteeNames.push(student.name);
+          }
+        });
+        
+        const absenteesString = absenteeNames.join('; ');
+        rows.push([sectionName, totalStrength.toString(), presentCount.toString(), absentCount.toString(), absenteesString].map(field => `"${field}"`).join(','));
+      }
+      
+      const csvContent = [headers.map(h => `"${h}"`).join(','), ...rows].join('\n');
+      
+      console.log('✅ LOG CSV export completed successfully');
+      return csvContent;
+      
+    } catch (error) {
+      console.error('❌ LOG CSV export failed:', error);
+      throw error;
+    }
+  };
+
+  /**
    * Export attendance data for multiple dates as CSV
    * @param dateRange - Array of dates in YYYY-MM-DD format
    * @param section - Optional section filter
@@ -229,6 +287,24 @@ export function SimpleAttendanceDialog({
     } catch (error) {
       console.error('Export failed:', error);
       setError('Failed to export attendance. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogExport = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const csvContent = await exportLogCSV(targetDate, sectionFilter);
+      
+      const filename = `attendance_log_${targetDate}_${sectionFilter === 'All' ? 'all_sections' : sectionFilter.replace(/\s+/g, '_')}.csv`;
+      downloadCSV(csvContent, filename);
+      
+    } catch (error) {
+      console.error('Log export failed:', error);
+      setError('Failed to export attendance log. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -399,25 +475,53 @@ export function SimpleAttendanceDialog({
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                 CSV will contain daily attendance based on actual date changes:
               </Typography>
+              
+              {/* Attendance CSV Preview */}
+              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600, fontSize: '0.875rem' }}>
+                Attendance CSV Format:
+              </Typography>
               <Box component="pre" sx={{ 
                 fontSize: '0.75rem', 
                 bgcolor: 'rgba(0, 0, 0, 0.1)', 
                 p: 1.5, 
                 borderRadius: 1,
                 overflow: 'auto',
-                fontFamily: 'monospace'
+                fontFamily: 'monospace',
+                mb: 2
               }}>
 {exportType === 'single' 
   ? `Student Name,Roll Number,${formatDateDDMMYYYY(targetDate)}\n"Alice Johnson","1","P"\n"Bob Smith","2","A"\n"Charlie Davis","3","P"`
   : `Student Name,Roll Number,${formatDateDDMMYYYY(startDate)},${startDate !== endDate ? '...' : ''},${formatDateDDMMYYYY(endDate)}\n"Alice Johnson","1","P","P","P"\n"Bob Smith","2","A","P","A"\n"Charlie Davis","3","P","P","P"`
 }
               </Box>
+
+              {/* Log CSV Preview (only for single date) */}
+              {exportType === 'single' && (
+                <>
+                  <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600, fontSize: '0.875rem' }}>
+                    Log CSV Format:
+                  </Typography>
+                  <Box component="pre" sx={{ 
+                    fontSize: '0.75rem', 
+                    bgcolor: 'rgba(0, 0, 0, 0.1)', 
+                    p: 1.5, 
+                    borderRadius: 1,
+                    overflow: 'auto',
+                    fontFamily: 'monospace',
+                    mb: 2
+                  }}>
+{`Section,Total Strength,Present,Absent,Names of Absentees\n"XI Raman","32","30","2","Bob Smith; Charlie Davis"\n"XI Curie","30","28","2","Alice Johnson; David Wilson"`}
+                  </Box>
+                </>
+              )}
+
               <Typography variant="caption" color="text.secondary">
                 • Students sorted alphabetically by name<br/>
                 • Roll numbers start from 1 within each section<br/>
                 • Default status is Absent (A)<br/>
                 • Present (P) only if marked present on that specific date<br/>
-                • Date-based attendance tracking with audit trail
+                • Date-based attendance tracking with audit trail<br/>
+                {exportType === 'single' && '• Log CSV provides section-wise summary with absentee names'}
               </Typography>
             </CardContent>
           </Card>
@@ -428,21 +532,40 @@ export function SimpleAttendanceDialog({
         <Button onClick={onClose} color="inherit">
           Cancel
         </Button>
-        <Button
-          variant="contained"
-          onClick={handleExport}
-          disabled={loading}
-          startIcon={loading ? <CircularProgress size={16} /> : <FileDownload />}
-          sx={{
-            minWidth: 120,
-            background: 'linear-gradient(45deg, #007AFF, #5AC8FA)',
-            '&:hover': {
-              background: 'linear-gradient(45deg, #0051D5, #007AFF)',
-            },
-          }}
-        >
-          {loading ? 'Exporting...' : 'Export CSV'}
-        </Button>
+        <Box display="flex" gap={1}>
+          <Button
+            variant="outlined"
+            onClick={handleLogExport}
+            disabled={loading || exportType === 'multiple'}
+            startIcon={loading ? <CircularProgress size={16} /> : <FileDownload />}
+            sx={{
+              minWidth: 120,
+              borderColor: '#007AFF',
+              color: '#007AFF',
+              '&:hover': {
+                borderColor: '#0051D5',
+                backgroundColor: 'rgba(0, 122, 255, 0.04)',
+              },
+            }}
+          >
+            {loading ? 'Exporting...' : 'Log CSV'}
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleExport}
+            disabled={loading}
+            startIcon={loading ? <CircularProgress size={16} /> : <FileDownload />}
+            sx={{
+              minWidth: 120,
+              background: 'linear-gradient(45deg, #007AFF, #5AC8FA)',
+              '&:hover': {
+                background: 'linear-gradient(45deg, #0051D5, #007AFF)',
+              },
+            }}
+          >
+            {loading ? 'Exporting...' : 'Export CSV'}
+          </Button>
+        </Box>
       </DialogActions>
     </Dialog>
   );
