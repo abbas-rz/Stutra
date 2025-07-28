@@ -2,6 +2,10 @@
 requests>=2.25.0
 python-dotenv>=0.19.0
 
+# TUI (Terminal User Interface) requirements
+textual>=0.45.0
+rich>=13.0.0
+
 # Legacy add_students.py requirements (for backwards compatibility)
 firebase-admin>=6.2.0
 pandas>=2.0.0
