@@ -211,6 +211,57 @@ class FirebaseService {
   }
 
   /**
+   * Get all students without access control restrictions (for Guard Page)
+   */
+  async getAllStudents(): Promise<Student[]> {
+    if (!this.initialized || !this.database) {
+      throw new Error('Firebase not initialized');
+    }
+
+    try {
+      const dbRef = ref(this.database);
+      const snapshot = await get(child(dbRef, 'students'));
+      
+      if (!snapshot.exists()) {
+        return [];
+      }
+
+      const studentsData = snapshot.val();
+      const students: Student[] = [];
+
+      // Handle both dictionary and array formats from Firebase
+      if (Array.isArray(studentsData)) {
+        // Array format
+        studentsData.forEach((studentData, index) => {
+          if (studentData) {
+            const student = this.adaptStudentData(studentData, index.toString());
+            students.push(this.needsDailyReset(student) ? this.resetStudentForNewDay(student) : student);
+          }
+        });
+      } else {
+        // Dictionary format
+        Object.entries(studentsData).forEach(([studentId, studentData]) => {
+          if (studentData && typeof studentData === 'object') {
+            const student = this.adaptStudentData(studentData as Record<string, unknown>, studentId);
+            students.push(this.needsDailyReset(student) ? this.resetStudentForNewDay(student) : student);
+          }
+        });
+      }
+
+      // Remove duplicates by ID and admission number, keeping the first occurrence
+      const uniqueStudents = students.filter((student, index, self) => {
+        return index === self.findIndex(s => s.id === student.id) &&
+               index === self.findIndex(s => s.admission_number === student.admission_number);
+      });
+
+      return uniqueStudents.sort((a, b) => a.name.localeCompare(b.name));
+    } catch (error) {
+      console.error('Error fetching all students:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Update a student's status and activity
    */
   async updateStudentStatus(
@@ -275,6 +326,36 @@ class FirebaseService {
   }
 
   /**
+   * Update a complete student record without access control (for Guard Page)
+   */
+  async updateStudentWithoutAccessControl(student: Student): Promise<void> {
+    if (!this.initialized || !this.database) {
+      throw new Error('Firebase not initialized');
+    }
+
+    try {
+      const studentRef = ref(this.database, `students/${student.id}`);
+      const studentData = {
+        name: student.name,
+        admissionNumber: student.admission_number,
+        sections: student.sections,
+        photoUrl: student.photo_url,
+        status: student.status,
+        activity: student.activity,
+        timer_end: student.timer_end,
+        notes: student.notes,
+        lastResetDate: student.lastResetDate,
+        updatedAt: new Date().toISOString()
+      };
+
+      await set(studentRef, studentData);
+    } catch (error) {
+      console.error('Error updating student (without access control):', error);
+      throw error;
+    }
+  }
+
+  /**
    * Update student with attendance logging
    */
   async updateStudentWithLog(student: Student, previousStatus?: string): Promise<void> {
@@ -283,6 +364,26 @@ class FirebaseService {
     
     await this.updateStudent(student);
     console.log(`✅ Student updated in database`);
+    
+    // Log the change if status changed
+    if (previousStatus && previousStatus !== student.status) {
+      console.log(`📝 Status changed detected - calling logAttendanceChange()`);
+      await this.logAttendanceChange(student, previousStatus);
+    } else {
+      console.log(`⏭️ No status change detected - skipping attendance log`);
+      console.log(`⏭️ Previous: "${previousStatus}", Current: "${student.status}"`);
+    }
+  }
+
+  /**
+   * Update student with attendance logging without access control (for Guard Page)
+   */
+  async updateStudentWithLogWithoutAccessControl(student: Student, previousStatus?: string): Promise<void> {
+    console.log(`🔄 updateStudentWithLogWithoutAccessControl called for ${student.name} (ID: ${student.id})`);
+    console.log(`🔄 Previous status: ${previousStatus}, New status: ${student.status}`);
+    
+    await this.updateStudentWithoutAccessControl(student);
+    console.log(`✅ Student updated in database (without access control)`);
     
     // Log the change if status changed
     if (previousStatus && previousStatus !== student.status) {

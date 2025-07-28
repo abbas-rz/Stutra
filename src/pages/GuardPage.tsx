@@ -21,7 +21,7 @@ import {
   PersonOutline,
 } from '@mui/icons-material';
 import appleTheme from '../theme';
-import { useStudents } from '../hooks';
+import { useAllStudents } from '../hooks';
 import type { Student } from '../types';
 
 // Fuzzy search function
@@ -237,7 +237,7 @@ function GuardStudentCard({ student, onStudentUpdate }: GuardStudentCardProps) {
 export default function GuardPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentTime, setCurrentTime] = useState(Date.now());
-  const { students, loading, error, updateStudentStatus } = useStudents();
+  const { students, loading, error, updateStudentStatus } = useAllStudents();
 
   // Update current time every second for live timer updates
   useEffect(() => {
