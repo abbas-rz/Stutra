@@ -25,7 +25,7 @@ This document summarizes all the cleanup, optimization, and enhancement work com
 - **Maintained sorting in search results** for consistent user experience
 
 ### Implementation Details
-```typescript
+```typescript 
 // Sort all students alphabetically by name
 return studentsToFilter.sort((a, b) => a.name.localeCompare(b.name));
 

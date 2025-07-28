@@ -110,6 +110,8 @@ export default function App() {
     try {
       await authService.logout();
       handleUserMenuClose();
+      // Force a hard redirect to login page to ensure authentication state is properly reset
+      window.location.href = '/login';
     } catch (error) {
       console.error('Error signing out:', error);
     }
