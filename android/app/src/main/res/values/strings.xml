@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">stutra</string>
+    <string name="title_activity_main">stutra</string>
+    <string name="package_name">dev.abbas.is_a</string>
+    <string name="custom_url_scheme">dev.abbas.is_a</string>
+</resources>
