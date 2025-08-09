@@ -18,6 +18,7 @@ export interface UseStudentsResult {
   addStudentNote: (studentId: number, note: string) => Promise<void>;
   deleteStudentNote: (studentId: number, noteIndex: number) => Promise<void>;
   markAllPresent: (section?: string) => Promise<void>;
+  markAllAbsent: (section?: string) => Promise<void>;
 }
 
 export function useStudents(): UseStudentsResult {
@@ -213,6 +214,56 @@ export function useStudents(): UseStudentsResult {
     }
   }, [students, refreshStudents]);
 
+  const markAllAbsent = useCallback(async (section?: string) => {
+    console.log(`🎯 markAllAbsent called - Section: ${section || 'All'}`);
+
+    const studentsToUpdate = section && section !== 'All'
+      ? students.filter(student =>
+          student.sections.includes(section) ||
+          student.section === section // Legacy field compatibility
+        )
+      : students;
+
+    console.log(`🎯 Students to mark absent: ${studentsToUpdate.length}`);
+
+    // Capture previous statuses BEFORE updating local state
+    const studentUpdates = studentsToUpdate.map(student => ({
+      student,
+      previousStatus: student.status,
+      updatedStudent: {
+        ...student,
+        status: 'absent' as const,
+        activity: '',
+        timer_end: null,
+      }
+    }));
+
+    // Update local state immediately
+    const updated = students.map(student => {
+      const updateInfo = studentUpdates.find(u => u.student.id === student.id);
+      return updateInfo ? updateInfo.updatedStudent : student;
+    });
+    setStudents(updated);
+
+    try {
+      console.log(`🔄 Starting updateStudentWithLog for ${studentsToUpdate.length} students (Absent)`);
+      const promises = studentUpdates.map(({ student, previousStatus, updatedStudent }) => {
+        console.log(`🔄 Marking ${student.name} absent (was ${previousStatus})`);
+        // Force logging regardless of previous status similar to markAllPresent
+        return firebaseService.updateStudent(updatedStudent).then(async () => {
+          await firebaseService.logAttendanceChange(updatedStudent, previousStatus || 'unknown');
+          console.log(`✅ Forced attendance log for ${student.name} in Mark All Absent`);
+        });
+      });
+
+      await Promise.all(promises);
+      console.log(`✅ Mark all absent completed for ${studentsToUpdate.length} students`);
+    } catch (err) {
+      console.error('Failed to update students (absent):', err);
+      await refreshStudents();
+    }
+  }, [students, refreshStudents]);
+
   // Initial load
   useEffect(() => {
     refreshStudents();
@@ -242,5 +293,6 @@ export function useStudents(): UseStudentsResult {
     addStudentNote,
     deleteStudentNote,
     markAllPresent,
+    markAllAbsent,
   };
 }

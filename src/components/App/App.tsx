@@ -19,6 +19,15 @@ import {
   IconButton,
   Menu,
   Divider,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  List,
+  ListItem,
+  ListItemText,
+  Chip,
+  Stack,
 } from '@mui/material';
 import {
   Search,
@@ -27,6 +36,11 @@ import {
   Logout,
   Person,
   CheckCircle,
+  Cancel,
+  Brightness7,
+  Brightness4,
+  Group,
+  DirectionsRun,
 } from '@mui/icons-material';
 import appleTheme from '../../theme';
 import { StudentCard } from '../StudentCard/index';
@@ -70,6 +84,9 @@ export default function App() {
   const [notesDialogOpen, setNotesDialogOpen] = useState<boolean>(false);
   const [simpleAttendanceOpen, setSimpleAttendanceOpen] = useState<boolean>(false);
   const [userMenuAnchor, setUserMenuAnchor] = useState<null | HTMLElement>(null);
+  const [countsOpen, setCountsOpen] = useState(false);
+  const [bunkingOpen, setBunkingOpen] = useState(false);
+  const [themeMode, setThemeMode] = useState<'dark' | 'light'>('dark');
 
   // Responsive Design
   const isMobile = useMediaQuery(appleTheme.breakpoints.down(BREAKPOINTS.MOBILE));
@@ -83,7 +100,8 @@ export default function App() {
     resetStudent, 
     addStudentNote, 
     deleteStudentNote,
-    markAllPresent
+    markAllPresent,
+    markAllAbsent,
   } = useStudents();
   const { 
     searchTerm, 
@@ -96,6 +114,30 @@ export default function App() {
 
   // Authentication
   const currentTeacher = authService.getCurrentTeacher();
+
+  // Derived counts across all sections
+  const presentTotal = useMemo(() => students.filter(s => s.status !== 'absent').length, [students]);
+  const totalStudents = students.length;
+
+  const bunkingStudents = useMemo(() => students.filter(s => s.status === 'bunking'), [students]);
+
+  // New: section-wise counts
+  const sectionCounts = useMemo(() => {
+    const actualSections = sections.filter((s) => s !== 'All');
+    return actualSections.map((sec) => {
+      const secStudents = students.filter((st) => (st.sections?.includes(sec)) || st.section === sec);
+      const present = secStudents.filter((st) => st.status !== 'absent').length;
+      return { section: sec, present, total: secStudents.length };
+    });
+  }, [sections, students]);
+
+  const selectedSectionCounts = useMemo(() => {
+    if (selectedSection && selectedSection !== 'All') {
+      const found = sectionCounts.find((s) => s.section === selectedSection);
+      return found || { section: selectedSection, present: 0, total: 0 };
+    }
+    return { section: 'All', present: presentTotal, total: totalStudents };
+  }, [selectedSection, sectionCounts, presentTotal, totalStudents]);
 
   // Event Handlers
   const handleUserMenuOpen = useCallback((event: React.MouseEvent<HTMLElement>) => {
@@ -186,9 +228,16 @@ export default function App() {
     [selectedStudentId, students]
   );
 
+  // Build theme based on mode
+  const themed = useMemo(() => {
+    // Clone theme and override palette mode and minimal backgrounds
+    const t = { ...appleTheme, palette: { ...appleTheme.palette, mode: themeMode, background: { ...appleTheme.palette.background, default: themeMode === 'light' ? '#fafafa' : appleTheme.palette.background.default, paper: themeMode === 'light' ? '#ffffff' : appleTheme.palette.background.paper }, text: { ...appleTheme.palette.text, primary: themeMode === 'light' ? '#1f2937' : appleTheme.palette.text.primary, secondary: themeMode === 'light' ? '#4b5563' : appleTheme.palette.text.secondary } } } as typeof appleTheme;
+    return t;
+  }, [themeMode]);
+
   if (loading) {
     return (
-      <ThemeProvider theme={appleTheme}>
+      <ThemeProvider theme={themed}>
         <CssBaseline />
         <Container maxWidth="lg" sx={{ py: 3, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
           <Box display="flex" flexDirection="column" alignItems="center" gap={2}>
@@ -204,7 +253,7 @@ export default function App() {
 
   if (error) {
     return (
-      <ThemeProvider theme={appleTheme}>
+      <ThemeProvider theme={themed}>
         <CssBaseline />
         <Container maxWidth="lg" sx={{ py: 3 }}>
           <Alert severity="error" sx={{ mt: 3, borderRadius: 2 }}>
@@ -219,7 +268,7 @@ export default function App() {
   }
 
   return (
-    <ThemeProvider theme={appleTheme}>
+    <ThemeProvider theme={themed}>
       <CssBaseline />
       <Container maxWidth="lg" sx={{ py: 3, position: 'relative', minHeight: '100vh' }}>
         <Box mb={4}>
@@ -243,6 +292,19 @@ export default function App() {
             </Box>
 
             <Box display="flex" alignItems="center" gap={1}>
+              {/* Theme toggle */}
+              <IconButton
+                onClick={() => setThemeMode(prev => (prev === 'dark' ? 'light' : 'dark'))}
+                sx={{
+                  bgcolor: 'rgba(0, 122, 255, 0.1)',
+                  color: 'primary.main',
+                  '&:hover': { bgcolor: 'rgba(0, 122, 255, 0.2)' },
+                }}
+                title={themeMode === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+              >
+                {themeMode === 'light' ? <Brightness4 /> : <Brightness7 />}
+              </IconButton>
+
               {/* Section Dropdown */}
               <FormControl size="small" sx={{ minWidth: 120 }}>
                 <InputLabel sx={{ color: 'text.secondary' }}>Section</InputLabel>
@@ -353,7 +415,7 @@ export default function App() {
               }}
             />
             
-            <Box display="flex" gap={1}>
+            <Box display="flex" gap={1} flexWrap="wrap">
               <Button
                 variant="outlined"
                 onClick={() => markAllPresent(selectedSection === 'All' ? undefined : selectedSection)}
@@ -369,6 +431,60 @@ export default function App() {
                 }}
               >
                 {isMobile ? '' : `Mark All Present${selectedSection !== 'All' ? ` (${selectedSection})` : ''}`}
+              </Button>
+
+              {/* New: Mark All Absent */}
+              <Button
+                variant="outlined"
+                onClick={() => markAllAbsent(selectedSection === 'All' ? undefined : selectedSection)}
+                startIcon={<Cancel />}
+                sx={{
+                  borderColor: 'rgba(255, 255, 255, 0.2)',
+                  color: 'text.primary',
+                  whiteSpace: 'nowrap',
+                  '&:hover': {
+                    borderColor: 'error.main',
+                    bgcolor: 'rgba(255, 69, 58, 0.08)',
+                  },
+                }}
+              >
+                {isMobile ? '' : `Mark All Absent${selectedSection !== 'All' ? ` (${selectedSection})` : ''}`}
+              </Button>
+              
+              {/* New: View counts across all sections */}
+              <Button
+                variant="outlined"
+                onClick={() => setCountsOpen(true)}
+                startIcon={<Group />}
+                sx={{
+                  borderColor: 'rgba(255, 255, 255, 0.2)',
+                  color: 'text.primary',
+                  whiteSpace: 'nowrap',
+                  '&:hover': {
+                    borderColor: 'primary.main',
+                    bgcolor: 'rgba(0, 122, 255, 0.1)',
+                  },
+                }}
+              >
+                {isMobile ? '' : `${selectedSectionCounts.present}/${selectedSectionCounts.total} (${selectedSectionCounts.section})`}
+              </Button>
+
+              {/* New: View all bunking students */}
+              <Button
+                variant="outlined"
+                onClick={() => setBunkingOpen(true)}
+                startIcon={<DirectionsRun />}
+                sx={{
+                  borderColor: 'rgba(255, 255, 255, 0.2)',
+                  color: 'text.primary',
+                  whiteSpace: 'nowrap',
+                  '&:hover': {
+                    borderColor: 'primary.main',
+                    bgcolor: 'rgba(0, 122, 255, 0.1)',
+                  },
+                }}
+              >
+                {isMobile ? '' : 'View Bunking'}
               </Button>
               
               <Button
@@ -392,26 +508,28 @@ export default function App() {
         </Box>
 
         {/* Students Grid */}
-        <Fade in={true} timeout={800}>
-          <Box
-            display="grid"
-            gridTemplateColumns={isMobile ? '1fr' : 'repeat(auto-fill, minmax(320px, 1fr))'}
-            gap={2}
-            sx={{ pb: 10 }}
-          >
-            {filteredStudents.map((student) => (
-              <StudentCard
-                key={`${student.id}-${student.admission_number}`}
-                student={student}
-                onStatusChange={handleStatusChange}
-                onActivitySelect={handleActivitySelect}
-                onNotesOpen={handleNotesOpen}
-                onResetStudent={handleResetStudent}
-                isMobile={isMobile}
-              />
-            ))}
-          </Box>
-        </Fade>
+        <ThemeProvider theme={appleTheme}>
+          <Fade in={true} timeout={800}>
+            <Box
+              display="grid"
+              gridTemplateColumns={isMobile ? '1fr' : 'repeat(auto-fill, minmax(320px, 1fr))'}
+              gap={2}
+              sx={{ pb: 10 }}
+            >
+              {filteredStudents.map((student) => (
+                <StudentCard
+                  key={`${student.id}-${student.admission_number}`}
+                  student={student}
+                  onStatusChange={handleStatusChange}
+                  onActivitySelect={handleActivitySelect}
+                  onNotesOpen={handleNotesOpen}
+                  onResetStudent={handleResetStudent}
+                  isMobile={isMobile}
+                />
+              ))}
+            </Box>
+          </Fade>
+        </ThemeProvider>
 
         {/* Student Count Badge */}
         <Box
@@ -466,6 +584,58 @@ export default function App() {
           sections={sections}
           selectedSection={selectedSection}
         />
+
+        {/* Counts Dialog */}
+        <Dialog open={countsOpen} onClose={() => setCountsOpen(false)} maxWidth="sm" fullWidth>
+          <DialogTitle>Attendance Summary (Section-wise)</DialogTitle>
+          <DialogContent>
+            {sectionCounts.length === 0 ? (
+              <Typography variant="body2" color="text.secondary">No sections available.</Typography>
+            ) : (
+              <List>
+                {sectionCounts.map((s) => (
+                  <ListItem key={s.section} divider>
+                    <ListItemText
+                      primary={s.section}
+                      secondary={`${s.present}/${s.total} present`}
+                    />
+                    <Stack direction="row" spacing={1}>
+                      <Chip label={`Present: ${s.present}`} color="success" />
+                      <Chip label={`Total: ${s.total}`} />
+                    </Stack>
+                  </ListItem>
+                ))}
+              </List>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setCountsOpen(false)}>Close</Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Bunking Students Dialog */}
+        <Dialog open={bunkingOpen} onClose={() => setBunkingOpen(false)} maxWidth="sm" fullWidth>
+          <DialogTitle>Bunking Students (All Sections)</DialogTitle>
+          <DialogContent dividers>
+            {bunkingStudents.length === 0 ? (
+              <Typography variant="body2" color="text.secondary">No bunking students.</Typography>
+            ) : (
+              <List>
+                {bunkingStudents.map((s) => (
+                  <ListItem key={s.id} divider>
+                    <ListItemText
+                      primary={`${s.name} (#${s.admission_number})`}
+                      secondary={`Sections: ${s.sections?.join(', ') || s.section || 'Unknown'}`}
+                    />
+                  </ListItem>
+                ))}
+              </List>
+            )}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setBunkingOpen(false)}>Close</Button>
+          </DialogActions>
+        </Dialog>
       </Container>
     </ThemeProvider>
   );
