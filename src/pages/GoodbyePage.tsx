@@ -52,7 +52,7 @@ export default function GoodbyePage() {
 
           <Typography variant="body1" color="text.secondary" sx={{ lineHeight: 1.8, maxWidth: 420 }}>
             {APP_CONFIG.APP_NAME} is no longer being hosted by Abbas Raza. We are grateful for
-            everyone who used this app to track and manage their students.
+            everyone who used {APP_CONFIG.APP_NAME} to track and manage their students.
           </Typography>
 
           <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.8, maxWidth: 420 }}>
